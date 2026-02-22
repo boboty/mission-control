@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, PriorityBadge, DetailModal, ClickableItem, LeftNav, type DetailData } from '../components';
 import { Icon } from '../components/Icon';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
@@ -59,6 +59,14 @@ interface Health {
   created_at: string;
 }
 
+interface PaginationInfo {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
 // ============ 工具函数 ============
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -83,31 +91,6 @@ function formatUpdateTime(dateStr: string | null): string {
   });
 }
 
-// 任务排序函数
-function sortTasks(tasks: Task[], sortBy: string): Task[] {
-  const sorted = [...tasks];
-  switch (sortBy) {
-    case 'priority':
-      return sorted.sort((a, b) => {
-        const priorityOrder = { high: 0, medium: 1, low: 2 };
-        return priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder];
-      });
-    case 'dueDate':
-      return sorted.sort((a, b) => {
-        if (!a.due_at) return 1;
-        if (!b.due_at) return -1;
-        return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
-      });
-    case 'status':
-      const statusOrder = { todo: 0, in_progress: 1, done: 2 };
-      return sorted.sort((a, b) => {
-        return statusOrder[a.status as keyof typeof statusOrder] - statusOrder[b.status as keyof typeof statusOrder];
-      });
-    default:
-      return sorted;
-  }
-}
-
 // 按状态分组任务
 function groupTasksByStatus(tasks: Task[]): Record<string, Task[]> {
   return tasks.reduce((groups, task) => {
@@ -128,9 +111,17 @@ const statusGroupNames: Record<string, string> = {
   blocked: '已阻塞',
 };
 
+// 状态选项
+const statusOptions = [
+  { value: '', label: '全部状态' },
+  { value: 'todo', label: '待办' },
+  { value: 'in_progress', label: '进行中' },
+  { value: 'blocked', label: '已阻塞' },
+  { value: 'done', label: '已完成' },
+];
+
 // ============ 数据转换函数 ============
 function taskToDetail(task: Task): DetailData {
-  // 构建时间线（基于创建和更新时间）
   const timeline: any[] = [];
   if (task.due_at) {
     timeline.push({
@@ -149,7 +140,6 @@ function taskToDetail(task: Task): DetailData {
     icon: 'clock',
   });
   
-  // 构建关联对象（示例：依赖任务）
   const relatedObjects: any[] = [];
   if (task.blocker) {
     relatedObjects.push({
@@ -328,7 +318,7 @@ function SystemStatus({ health }: { health: Health[] }) {
   );
 }
 
-// 任务列表项 - 增强阻塞高亮 + 可点击
+// 任务列表项
 function TaskItem({ task, compact = false, onClick }: { task: Task; compact?: boolean; onClick?: () => void }) {
   const isBlocked = task.blocker || task.status === 'blocked';
   
@@ -406,6 +396,37 @@ function TaskGroup({ title, tasks, compact = false, onTaskClick }: { title: stri
             onClick={onTaskClick ? () => onTaskClick(task) : undefined}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+// 分页控制组件
+function Pagination({ pagination, onPageChange }: { pagination: PaginationInfo; onPageChange: (page: number) => void }) {
+  const { page, totalPages, hasMore } = pagination;
+  
+  if (totalPages <= 1) return null;
+  
+  return (
+    <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-light)] dark:border-[var(--border-medium)]">
+      <span className="text-xs text-[var(--text-muted)]">
+        第 {page} / {totalPages} 页
+      </span>
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="px-3 py-1.5 text-xs rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-secondary)] transition-colors"
+        >
+          上一页
+        </button>
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={!hasMore}
+          className="px-3 py-1.5 text-xs rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-secondary)] transition-colors"
+        >
+          下一页
+        </button>
       </div>
     </div>
   );
@@ -523,7 +544,7 @@ function HealthItem({ snapshot, onClick }: { snapshot: Health; onClick?: () => v
   return content;
 }
 
-// 模块卡片配置 - 使用图标名称替代 emoji
+// 模块卡片配置
 const MODULE_CONFIG = [
   { name: '任务看板', icon: 'tasks', color: 'from-blue-500 to-blue-600', key: 'tasks' },
   { name: '流程管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
@@ -549,6 +570,13 @@ export default function Dashboard() {
   const [taskSortBy, setTaskSortBy] = useState<'default' | 'priority' | 'dueDate' | 'status'>('default');
   const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped'>('list');
   
+  // 任务筛选和分页状态
+  const [taskSearch, setTaskSearch] = useState('');
+  const [taskStatusFilter, setTaskStatusFilter] = useState('');
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
+  const [taskLoading, setTaskLoading] = useState(false);
+  
   // 详情浮窗状态
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DetailData | null>(null);
@@ -560,11 +588,40 @@ export default function Dashboard() {
   // 数据验证状态
   const [dataValidation, setDataValidation] = useState<Record<string, { valid: boolean; warnings: string[] }>>({});
 
+  // 获取任务数据（支持分页、筛选、搜索）
+  const fetchTasks = useCallback(async (page = 1) => {
+    setTaskLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: '20',
+        sortBy: taskSortBy,
+      });
+      if (taskStatusFilter) params.append('status', taskStatusFilter);
+      if (taskSearch) params.append('search', taskSearch);
+      
+      const res = await fetch(`/api/tasks?${params.toString()}`);
+      const data = await res.json();
+      
+      if (data.tasks) {
+        setTasks(data.tasks);
+        setTaskPagination(data.pagination);
+        const validation = validateData('tasks', data.tasks);
+        setDataValidation(prev => ({ ...prev, tasks: { valid: validation.valid, warnings: validation.warnings } }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err);
+    } finally {
+      setTaskLoading(false);
+    }
+  }, [taskSortBy, taskStatusFilter, taskSearch]);
+
+  // 初始加载所有数据
   useEffect(() => {
     async function fetchData() {
       try {
         const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoriesRes, healthRes, metricsRes] = await Promise.all([
-          fetch('/api/tasks'),
+          fetch('/api/tasks?page=1&pageSize=20'),
           fetch('/api/pipelines'),
           fetch('/api/events'),
           fetch('/api/agents'),
@@ -583,6 +640,7 @@ export default function Dashboard() {
 
         if (tasksData.tasks) {
           setTasks(tasksData.tasks);
+          setTaskPagination(tasksData.pagination);
           const validation = validateData('tasks', tasksData.tasks);
           setDataValidation(prev => ({ ...prev, tasks: { valid: validation.valid, warnings: validation.warnings } }));
         }
@@ -608,13 +666,26 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // 指标状态（包含趋势）
+  // 当筛选条件变化时重新获取任务
+  useEffect(() => {
+    if (!loading) {
+      fetchTasks(1);
+      setTaskPage(1);
+    }
+  }, [taskStatusFilter, taskSearch, taskSortBy]);
+
+  // 处理分页变化
+  const handleTaskPageChange = (newPage: number) => {
+    fetchTasks(newPage);
+    setTaskPage(newPage);
+  };
+
+  // 指标状态
   const [metricsState, setMetricsState] = useState({
     metrics: { total: 0, inProgress: 0, blocked: 0, pending: 0 },
     trends: { total: 0, inProgress: 0, blocked: 0, pending: 0 },
   });
 
-  // 计算指标（从 API 获取带趋势的数据）
   const metrics = metricsState.metrics;
   const trends = metricsState.trends;
 
@@ -625,21 +696,18 @@ export default function Dashboard() {
   };
   
   // 渲染模块内容
-  const renderModuleContent = (key: string) => {
+  const renderModuleContent = (key: string, isSingleModule = false) => {
     switch (key) {
       case 'tasks':
-        if (tasks.length === 0) {
+        if (tasks.length === 0 && !taskLoading) {
           return <EmptyState moduleType="tasks" icon="empty-tasks" title="暂无任务" description="当前没有待办任务，一切正常！" />;
         }
         
-        // 应用排序
-        const sortedTasks = sortTasks(tasks, taskSortBy);
-        
-        // 控制视图模式
+        // 分组视图
         if (taskViewMode === 'grouped') {
-          const groupedTasks = groupTasksByStatus(sortedTasks);
+          const groupedTasks = groupTasksByStatus(tasks);
           return (
-            <div className="max-h-64 overflow-y-auto -mx-2">
+            <div className={`${isSingleModule ? 'max-h-none' : 'max-h-64'} overflow-y-auto -mx-2`}>
               {Object.entries(groupedTasks).map(([status, statusTasks]) => (
                 <TaskGroup 
                   key={status} 
@@ -649,23 +717,28 @@ export default function Dashboard() {
                   onTaskClick={(task) => openDetail(taskToDetail(task))}
                 />
               ))}
+              {taskPagination && <Pagination pagination={taskPagination} onPageChange={handleTaskPageChange} />}
             </div>
           );
         }
         
         // 列表视图
         return (
-          <div className="max-h-48 overflow-y-auto -mx-2">
-            {sortedTasks.slice(0, 5).map(task => (
-              <TaskItem 
-                key={task.id} 
-                task={task} 
-                compact={true} 
-                onClick={() => openDetail(taskToDetail(task))}
-              />
-            ))}
-            {tasks.length > 5 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-3">还有 {tasks.length - 5} 项任务</p>
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {taskLoading ? (
+              <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>
+            ) : (
+              <>
+                {tasks.map(task => (
+                  <TaskItem 
+                    key={task.id} 
+                    task={task} 
+                    compact={true} 
+                    onClick={() => openDetail(taskToDetail(task))}
+                  />
+                ))}
+                {taskPagination && <Pagination pagination={taskPagination} onPageChange={handleTaskPageChange} />}
+              </>
             )}
           </div>
         );
@@ -674,17 +747,14 @@ export default function Dashboard() {
           return <EmptyState moduleType="pipelines" icon="empty-pipeline" title="暂无流程" description="当前没有进行中的流程项目" />;
         }
         return (
-          <div className="max-h-48 overflow-y-auto -mx-2">
-            {pipelines.slice(0, 5).map(item => (
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {pipelines.map(item => (
               <PipelineItem 
                 key={item.id} 
                 item={item} 
                 onClick={() => openDetail(pipelineToDetail(item))}
               />
             ))}
-            {pipelines.length > 5 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-3">还有 {pipelines.length - 5} 项</p>
-            )}
           </div>
         );
       case 'events':
@@ -692,17 +762,14 @@ export default function Dashboard() {
           return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" />;
         }
         return (
-          <div className="max-h-48 overflow-y-auto -mx-2">
-            {events.slice(0, 5).map(event => (
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {events.map(event => (
               <EventItem 
                 key={event.id} 
                 event={event} 
                 onClick={() => openDetail(eventToDetail(event))}
               />
             ))}
-            {events.length > 5 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-3">还有 {events.length - 5} 项</p>
-            )}
           </div>
         );
       case 'memories':
@@ -710,17 +777,14 @@ export default function Dashboard() {
           return <EmptyState moduleType="memories" icon="empty-archive" title="暂无记录" description="还没有归档的记忆" />;
         }
         return (
-          <div className="max-h-48 overflow-y-auto -mx-2">
-            {memories.slice(0, 5).map(memory => (
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {memories.map(memory => (
               <MemoryItem 
                 key={memory.id} 
                 memory={memory} 
                 onClick={() => openDetail(memoryToDetail(memory))}
               />
             ))}
-            {memories.length > 5 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-3">还有 {memories.length - 5} 条</p>
-            )}
           </div>
         );
       case 'agents':
@@ -728,17 +792,14 @@ export default function Dashboard() {
           return <EmptyState moduleType="agents" icon="empty-team" title="暂无智能体" description="还没有注册的智能体" />;
         }
         return (
-          <div className="max-h-48 overflow-y-auto -mx-2">
-            {agents.slice(0, 5).map(agent => (
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {agents.map(agent => (
               <AgentItem 
                 key={agent.id} 
                 agent={agent} 
                 onClick={() => openDetail(agentToDetail(agent))}
               />
             ))}
-            {agents.length > 5 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-3">还有 {agents.length - 5} 个</p>
-            )}
           </div>
         );
       case 'health':
@@ -746,23 +807,98 @@ export default function Dashboard() {
           return <EmptyState moduleType="health" icon="empty-heart" title="暂无数据" description="健康检测数据尚未生成" />;
         }
         return (
-          <div className="max-h-48 overflow-y-auto -mx-2">
-            {health.slice(0, 5).map(snapshot => (
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {health.map(snapshot => (
               <HealthItem 
                 key={snapshot.id} 
                 snapshot={snapshot} 
                 onClick={() => openDetail(healthToDetail(snapshot))}
               />
             ))}
-            {health.length > 5 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-3">还有 {health.length - 5} 次检测</p>
-            )}
           </div>
         );
       default:
         return null;
     }
   };
+
+  // 渲染任务看板控制栏
+  const renderTaskControls = () => (
+    <div className="space-y-3 mb-4">
+      {/* 搜索和筛选行 */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* 搜索框 */}
+        <div className="flex-1">
+          <div className="relative">
+            <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder="搜索任务（标题或 ID）..."
+              value={taskSearch}
+              onChange={(e) => setTaskSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
+            />
+          </div>
+        </div>
+        
+        {/* 状态筛选 */}
+        <div className="sm:w-40">
+          <select
+            value={taskStatusFilter}
+            onChange={(e) => setTaskStatusFilter(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
+          >
+            {statusOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        
+        {/* 排序 */}
+        <div className="sm:w-36">
+          <select
+            value={taskSortBy}
+            onChange={(e) => setTaskSortBy(e.target.value as any)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
+          >
+            <option value="default">默认排序</option>
+            <option value="priority">优先级</option>
+            <option value="dueDate">截止日期</option>
+            <option value="status">状态</option>
+          </select>
+        </div>
+      </div>
+      
+      {/* 视图切换 */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[var(--text-muted)]">
+          {taskPagination ? `共 ${taskPagination.total} 项任务` : ''}
+        </span>
+        <div className="flex items-center space-x-1 bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-lg p-0.5">
+          <button
+            onClick={() => setTaskViewMode('list')}
+            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+              taskViewMode === 'list'
+                ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            列表
+          </button>
+          <button
+            onClick={() => setTaskViewMode('grouped')}
+            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+              taskViewMode === 'grouped'
+                ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            分组
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[var(--bg-primary)] via-[var(--bg-primary)] to-[var(--bg-secondary)] dark:from-[var(--bg-primary)] dark:via-[var(--bg-secondary)] dark:to-[var(--bg-primary)]">
@@ -774,29 +910,37 @@ export default function Dashboard() {
         onToggle={() => setNavCollapsed(!navCollapsed)}
       />
       
-      {/* 主内容区 - 根据导航状态调整左边距 */}
+      {/* 主内容区 */}
       <main className={`transition-all duration-300 ${navCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
           
-          {/* ========== 顶部标题区 ========== */}
+          {/* 顶部标题区 */}
           <header className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">任务控制中心</h1>
+                <h1 className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">
+                  {activeModule === 'dashboard' ? '任务控制中心' : MODULE_CONFIG.find(m => m.key === activeModule)?.name || '模块'}
+                </h1>
                 <p className="text-[var(--text-secondary)] mt-2 text-sm">
-                  实时数据看板 · Supabase 驱动
-                  {lastUpdated && (
-                    <span className="ml-3 text-[var(--text-muted)]">
-                      · 更新于 {formatUpdateTime(lastUpdated)}
-                    </span>
+                  {activeModule === 'dashboard' ? (
+                    <>
+                      实时数据看板 · Supabase 驱动
+                      {lastUpdated && (
+                        <span className="ml-3 text-[var(--text-muted)]">
+                          · 更新于 {formatUpdateTime(lastUpdated)}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    '单模块视图 · 完整列表'
                   )}
                 </p>
               </div>
-              <SystemStatus health={health} />
+              {activeModule === 'dashboard' && <SystemStatus health={health} />}
             </div>
           </header>
 
-          {/* ========== 错误提示 ========== */}
+          {/* 错误提示 */}
           {error && (
             <div className="mb-6 p-4 bg-[var(--badge-error-bg)] rounded-xl border border-[var(--border-medium)] flex items-start space-x-3">
               <Icon name="error" size={24} className="text-[var(--badge-error-text)]" />
@@ -807,7 +951,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ========== 数据质量警告 ========== */}
+          {/* 数据质量警告 */}
           {Object.entries(dataValidation).some(([_, v]) => v.warnings.length > 0) && (
             <div className="mb-6 p-4 bg-[var(--badge-warning-bg)] rounded-xl border border-[var(--border-medium)] flex items-start space-x-3">
               <Icon name="warning" size={24} className="text-[var(--badge-warning-text)]" />
@@ -826,57 +970,94 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ========== 关键指标区（带趋势） ========== */}
-          <MetricGroup>
-            {loading ? (
-              <>
-                <Metric label="任务总数" value={0} loading />
-                <Metric label="进行中" value={0} loading />
-                <Metric label="阻塞" value={0} loading />
-                <Metric label="待决策" value={0} loading />
-              </>
-            ) : (
-              <>
-                <Metric 
-                  label="任务总数" 
-                  value={metrics.total} 
-                  icon="metrics" 
-                  color="blue"
-                  trend={trends.total > 0 ? 'up' : trends.total < 0 ? 'down' : 'neutral'}
-                  trendValue={trends.total !== 0 ? `${trends.total > 0 ? '+' : ''}${trends.total}` : undefined}
-                />
-                <Metric 
-                  label="进行中" 
-                  value={metrics.inProgress} 
-                  icon="in-progress" 
-                  color="violet"
-                  trend={trends.inProgress > 0 ? 'up' : trends.inProgress < 0 ? 'down' : 'neutral'}
-                  trendValue={trends.inProgress !== 0 ? `${trends.inProgress > 0 ? '+' : ''}${trends.inProgress}` : undefined}
-                />
-                <Metric 
-                  label="阻塞" 
-                  value={metrics.blocked} 
-                  icon="blocked" 
-                  color={metrics.blocked > 0 ? 'rose' : 'emerald'}
-                  trend={trends.blocked > 0 ? 'up' : trends.blocked < 0 ? 'down' : 'neutral'}
-                  trendValue={trends.blocked !== 0 ? `${trends.blocked > 0 ? '+' : ''}${trends.blocked}` : undefined}
-                />
-                <Metric 
-                  label="待决策" 
-                  value={metrics.pending} 
-                  icon="pending" 
-                  color={metrics.pending > 0 ? 'amber' : 'slate'}
-                  trend={trends.pending > 0 ? 'up' : trends.pending < 0 ? 'down' : 'neutral'}
-                  trendValue={trends.pending !== 0 ? `${trends.pending > 0 ? '+' : ''}${trends.pending}` : undefined}
-                />
-              </>
-            )}
-          </MetricGroup>
+          {/* 单模块视图 */}
+          {activeModule !== 'dashboard' ? (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setActiveModule('dashboard')}
+                  className="text-sm px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center space-x-2"
+                >
+                  <Icon name="arrow-left" size={16} />
+                  <span>返回仪表盘</span>
+                </button>
+              </div>
 
-          {/* ========== 主工作区 ========== */}
-          {activeModule === 'dashboard' ? (
+              <Card hover={false} padding="none">
+                <div className="p-5">
+                  {activeModule === 'tasks' ? (
+                    <>
+                      {renderTaskControls()}
+                      <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                        {renderModuleContent(activeModule, true)}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <CardHeader
+                        icon={MODULE_CONFIG.find(m => m.key === activeModule)?.icon || 'metrics'}
+                        iconColor={MODULE_CONFIG.find(m => m.key === activeModule)?.color || 'from-slate-500 to-slate-600'}
+                        title={MODULE_CONFIG.find(m => m.key === activeModule)?.name || activeModule}
+                        subtitle="单模块视图"
+                      />
+                      <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                        {renderModuleContent(activeModule, true)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            </div>
+          ) : (
             <>
-              {/* ========== 模块卡片网格 ========== */}
+              {/* 仪表盘视图 - 关键指标区 */}
+              <MetricGroup>
+                {loading ? (
+                  <>
+                    <Metric label="任务总数" value={0} loading />
+                    <Metric label="进行中" value={0} loading />
+                    <Metric label="阻塞" value={0} loading />
+                    <Metric label="待决策" value={0} loading />
+                  </>
+                ) : (
+                  <>
+                    <Metric 
+                      label="任务总数" 
+                      value={metrics.total} 
+                      icon="metrics" 
+                      color="blue"
+                      trend={trends.total > 0 ? 'up' : trends.total < 0 ? 'down' : 'neutral'}
+                      trendValue={trends.total !== 0 ? `${trends.total > 0 ? '+' : ''}${trends.total}` : undefined}
+                    />
+                    <Metric 
+                      label="进行中" 
+                      value={metrics.inProgress} 
+                      icon="in-progress" 
+                      color="violet"
+                      trend={trends.inProgress > 0 ? 'up' : trends.inProgress < 0 ? 'down' : 'neutral'}
+                      trendValue={trends.inProgress !== 0 ? `${trends.inProgress > 0 ? '+' : ''}${trends.inProgress}` : undefined}
+                    />
+                    <Metric 
+                      label="阻塞" 
+                      value={metrics.blocked} 
+                      icon="blocked" 
+                      color={metrics.blocked > 0 ? 'rose' : 'emerald'}
+                      trend={trends.blocked > 0 ? 'up' : trends.blocked < 0 ? 'down' : 'neutral'}
+                      trendValue={trends.blocked !== 0 ? `${trends.blocked > 0 ? '+' : ''}${trends.blocked}` : undefined}
+                    />
+                    <Metric 
+                      label="待决策" 
+                      value={metrics.pending} 
+                      icon="pending" 
+                      color={metrics.pending > 0 ? 'amber' : 'slate'}
+                      trend={trends.pending > 0 ? 'up' : trends.pending < 0 ? 'down' : 'neutral'}
+                      trendValue={trends.pending !== 0 ? `${trends.pending > 0 ? '+' : ''}${trends.pending}` : undefined}
+                    />
+                  </>
+                )}
+              </MetricGroup>
+
+              {/* 模块卡片网格 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {loading ? (
                   MODULE_CONFIG.map((_, i) => <SkeletonCard key={i} lines={4} />)
@@ -884,7 +1065,6 @@ export default function Dashboard() {
                   MODULE_CONFIG.map((module) => (
                     <Card key={module.name} hover padding="none">
                       <div className="p-5">
-                        {/* 任务看板特殊处理：添加控制栏 */}
                         {module.key === 'tasks' ? (
                           <>
                             <div className="flex items-start justify-between mb-4">
@@ -894,52 +1074,12 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{module.name}</h2>
-                                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">共 {tasks.length} 项任务</p>
+                                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">共 {taskPagination?.total || tasks.length} 项任务</p>
                                 </div>
                               </div>
                             </div>
-                            {/* 控制栏：排序 + 视图切换 */}
-                            <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs text-[var(--text-muted)]">排序:</span>
-                                <select
-                                  value={taskSortBy}
-                                  onChange={(e) => setTaskSortBy(e.target.value as any)}
-                                  className="text-xs bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-md px-2 py-1 text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                                >
-                                  <option value="default">默认</option>
-                                  <option value="priority">优先级</option>
-                                  <option value="dueDate">截止日期</option>
-                                  <option value="status">状态</option>
-                                </select>
-                              </div>
-                              <div className="flex items-center space-x-1 bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-lg p-0.5">
-                                <button
-                                  onClick={() => setTaskViewMode('list')}
-                                  className={`px-2 py-1 text-xs rounded-md transition-all ${
-                                    taskViewMode === 'list'
-                                      ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                                  }`}
-                                  title="列表视图"
-                                >
-                                  列表
-                                </button>
-                                <button
-                                  onClick={() => setTaskViewMode('grouped')}
-                                  className={`px-2 py-1 text-xs rounded-md transition-all ${
-                                    taskViewMode === 'grouped'
-                                      ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                                  }`}
-                                  title="分组视图"
-                                >
-                                  分组
-                                </button>
-                              </div>
-                            </div>
                             <div className="-mt-3">
-                              {renderModuleContent(module.key)}
+                              {renderModuleContent(module.key, false)}
                             </div>
                           </>
                         ) : (
@@ -957,7 +1097,7 @@ export default function Dashboard() {
                               }
                             />
                             <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                              {renderModuleContent(module.key)}
+                              {renderModuleContent(module.key, false)}
                             </div>
                           </>
                         )}
@@ -967,43 +1107,9 @@ export default function Dashboard() {
                 )}
               </div>
             </>
-          ) : (
-            (() => {
-              const module = MODULE_CONFIG.find((m) => m.key === activeModule);
-              return (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-semibold text-[var(--text-primary)]">{module?.name || '模块'}</h2>
-                      <p className="text-sm text-[var(--text-muted)]">从左侧导航选择模块，当前为单模块视图</p>
-                    </div>
-                    <button
-                      onClick={() => setActiveModule('dashboard')}
-                      className="text-sm px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                    >
-                      返回仪表盘
-                    </button>
-                  </div>
-
-                  <Card hover={false} padding="none">
-                    <div className="p-5">
-                      <CardHeader
-                        icon={module?.icon || 'metrics'}
-                        iconColor={module?.color || 'from-slate-500 to-slate-600'}
-                        title={module?.name || activeModule}
-                        subtitle="单模块视图"
-                      />
-                      <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                        {renderModuleContent(activeModule)}
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              );
-            })()
           )}
 
-          {/* ========== 底部状态栏 ========== */}
+          {/* 底部状态栏 */}
           <footer className="mt-8">
             <Card hover={false} padding="md">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1030,7 +1136,7 @@ export default function Dashboard() {
             </Card>
           </footer>
 
-          {/* ========== 详情浮窗 ========== */}
+          {/* 详情浮窗 */}
           <DetailModal
             isOpen={detailOpen}
             onClose={() => setDetailOpen(false)}
