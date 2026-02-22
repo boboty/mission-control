@@ -873,96 +873,135 @@ export default function Dashboard() {
             )}
           </MetricGroup>
 
-          {/* ========== 模块卡片网格 ========== */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {loading ? (
-              MODULE_CONFIG.map((_, i) => <SkeletonCard key={i} lines={4} />)
-            ) : (
-              MODULE_CONFIG.map((module) => (
-                <Card key={module.name} hover padding="none">
-                  <div className="p-5">
-                    {/* 任务看板特殊处理：添加控制栏 */}
-                    {module.key === 'tasks' ? (
-                      <>
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center shadow-sm`}>
-                              <Icon name={module.icon} size={24} color="white" />
+          {/* ========== 主工作区 ========== */}
+          {activeModule === 'dashboard' ? (
+            <>
+              {/* ========== 模块卡片网格 ========== */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {loading ? (
+                  MODULE_CONFIG.map((_, i) => <SkeletonCard key={i} lines={4} />)
+                ) : (
+                  MODULE_CONFIG.map((module) => (
+                    <Card key={module.name} hover padding="none">
+                      <div className="p-5">
+                        {/* 任务看板特殊处理：添加控制栏 */}
+                        {module.key === 'tasks' ? (
+                          <>
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center shadow-sm`}>
+                                  <Icon name={module.icon} size={24} color="white" />
+                                </div>
+                                <div>
+                                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{module.name}</h2>
+                                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">共 {tasks.length} 项任务</p>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{module.name}</h2>
-                              <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">共 {tasks.length} 项任务</p>
+                            {/* 控制栏：排序 + 视图切换 */}
+                            <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-[var(--text-muted)]">排序:</span>
+                                <select
+                                  value={taskSortBy}
+                                  onChange={(e) => setTaskSortBy(e.target.value as any)}
+                                  className="text-xs bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-md px-2 py-1 text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                                >
+                                  <option value="default">默认</option>
+                                  <option value="priority">优先级</option>
+                                  <option value="dueDate">截止日期</option>
+                                  <option value="status">状态</option>
+                                </select>
+                              </div>
+                              <div className="flex items-center space-x-1 bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-lg p-0.5">
+                                <button
+                                  onClick={() => setTaskViewMode('list')}
+                                  className={`px-2 py-1 text-xs rounded-md transition-all ${
+                                    taskViewMode === 'list'
+                                      ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
+                                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                                  }`}
+                                  title="列表视图"
+                                >
+                                  列表
+                                </button>
+                                <button
+                                  onClick={() => setTaskViewMode('grouped')}
+                                  className={`px-2 py-1 text-xs rounded-md transition-all ${
+                                    taskViewMode === 'grouped'
+                                      ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
+                                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                                  }`}
+                                  title="分组视图"
+                                >
+                                  分组
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        {/* 控制栏：排序 + 视图切换 */}
-                        <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-[var(--text-muted)]">排序:</span>
-                            <select
-                              value={taskSortBy}
-                              onChange={(e) => setTaskSortBy(e.target.value as any)}
-                              className="text-xs bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-md px-2 py-1 text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                            >
-                              <option value="default">默认</option>
-                              <option value="priority">优先级</option>
-                              <option value="dueDate">截止日期</option>
-                              <option value="status">状态</option>
-                            </select>
-                          </div>
-                          <div className="flex items-center space-x-1 bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-lg p-0.5">
-                            <button
-                              onClick={() => setTaskViewMode('list')}
-                              className={`px-2 py-1 text-xs rounded-md transition-all ${
-                                taskViewMode === 'list'
-                                  ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                              }`}
-                              title="列表视图"
-                            >
-                              列表
-                            </button>
-                            <button
-                              onClick={() => setTaskViewMode('grouped')}
-                              className={`px-2 py-1 text-xs rounded-md transition-all ${
-                                taskViewMode === 'grouped'
-                                  ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                              }`}
-                              title="分组视图"
-                            >
-                              分组
-                            </button>
-                          </div>
-                        </div>
-                        <div className="-mt-3">
-                          {renderModuleContent(module.key)}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <CardHeader
-                          icon={module.icon}
-                          iconColor={module.color}
-                          title={module.name}
-                          subtitle={
-                            module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
-                            module.key === 'events' ? `共 ${events.length} 项日程` :
-                            module.key === 'memories' ? `共 ${memories.length} 条记录` :
-                            module.key === 'agents' ? `共 ${agents.length} 个智能体` :
-                            `共 ${health.length} 次检测`
-                          }
-                        />
-                        <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                          {renderModuleContent(module.key)}
-                        </div>
-                      </>
-                    )}
+                            <div className="-mt-3">
+                              {renderModuleContent(module.key)}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <CardHeader
+                              icon={module.icon}
+                              iconColor={module.color}
+                              title={module.name}
+                              subtitle={
+                                module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
+                                module.key === 'events' ? `共 ${events.length} 项日程` :
+                                module.key === 'memories' ? `共 ${memories.length} 条记录` :
+                                module.key === 'agents' ? `共 ${agents.length} 个智能体` :
+                                `共 ${health.length} 次检测`
+                              }
+                            />
+                            <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                              {renderModuleContent(module.key)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            (() => {
+              const module = MODULE_CONFIG.find((m) => m.key === activeModule);
+              return (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-[var(--text-primary)]">{module?.name || '模块'}</h2>
+                      <p className="text-sm text-[var(--text-muted)]">从左侧导航选择模块，当前为单模块视图</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveModule('dashboard')}
+                      className="text-sm px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    >
+                      返回仪表盘
+                    </button>
                   </div>
-                </Card>
-              ))
-            )}
-          </div>
+
+                  <Card hover={false} padding="none">
+                    <div className="p-5">
+                      <CardHeader
+                        icon={module?.icon || 'metrics'}
+                        iconColor={module?.color || 'from-slate-500 to-slate-600'}
+                        title={module?.name || activeModule}
+                        subtitle="单模块视图"
+                      />
+                      <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                        {renderModuleContent(activeModule)}
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              );
+            })()
+          )}
 
           {/* ========== 底部状态栏 ========== */}
           <footer className="mt-8">
