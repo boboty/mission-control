@@ -12,8 +12,8 @@ export async function GET(request: Request) {
   try {
     await client.connect();
 
-    // 查询待决策项：状态为 todo 且有下一步行动的任务
-    // 或者优先级为 high 的任务
+    // 查询待决策项（默认口径）：blocked 优先
+    // 说明：后续如需拓展，可加上“高优 todo 且 next_action 非空”作为次级入口。
     const decisionsQuery = `
       SELECT 
         id,
@@ -27,13 +27,9 @@ export async function GET(request: Request) {
         updated_at,
         source
       FROM tasks
-      WHERE 
-        (status = 'todo' AND next_action IS NOT NULL AND next_action != '')
-        OR priority = 'high'
-        OR blocker = true
+      WHERE blocker = true
       ORDER BY 
-        CASE priority WHEN 'high' THEN 1 ELSE 2 END,
-        CASE WHEN blocker = true THEN 0 ELSE 1 END,
+        updated_at DESC NULLS LAST,
         due_at ASC NULLS LAST
       LIMIT 50
     `;
@@ -48,10 +44,7 @@ export async function GET(request: Request) {
         COUNT(*) FILTER (WHERE due_at < NOW()) as overdue,
         COUNT(*) FILTER (WHERE blocker = true) as blocked
       FROM tasks
-      WHERE 
-        (status = 'todo' AND next_action IS NOT NULL AND next_action != '')
-        OR priority = 'high'
-        OR blocker = true
+      WHERE blocker = true
     `;
 
     const summaryResult = await client.query(summaryQuery);
