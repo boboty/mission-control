@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Icon } from './Icon';
 
 interface NavItem {
@@ -29,6 +29,28 @@ const navItems: NavItem[] = [
 ];
 
 export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed = false, onToggle }: LeftNavProps) {
+  const [blockedCount, setBlockedCount] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchBlockedCount() {
+      try {
+        const res = await fetch('/api/tasks?page=1&pageSize=1&status=blocked');
+        const data = await res.json();
+        const count = data?.pagination?.total ?? (Array.isArray(data?.tasks) ? data.tasks.length : 0);
+        if (!cancelled) setBlockedCount(Number(count) || 0);
+      } catch {
+        // ignore
+      }
+    }
+    fetchBlockedCount();
+    const t = setInterval(fetchBlockedCount, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
   return (
     <aside
       className={`
@@ -88,9 +110,9 @@ export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed 
                 {item.label}
               </span>
             )}
-            {!collapsed && item.key === 'tasks' && (
-              <span className="ml-auto text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-2 py-0.5 rounded-full">
-                3
+            {!collapsed && item.key === 'tasks' && blockedCount > 0 && (
+              <span className="ml-auto text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-2 py-0.5 rounded-full" title={`阻塞任务：${blockedCount}`}>
+                {blockedCount}
               </span>
             )}
           </button>
