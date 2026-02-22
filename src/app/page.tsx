@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, PriorityBadge, DetailModal, ClickableItem, LeftNav, type DetailData } from '../components';
+import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, PriorityBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert } from '../components';
 import { Icon } from '../components/Icon';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
 
@@ -57,6 +57,26 @@ interface Health {
   pending_decisions: number;
   cron_ok: boolean;
   created_at: string;
+}
+
+interface Decision {
+  id: number;
+  title: string;
+  status: string;
+  priority: string;
+  owner: string;
+  blocker: boolean;
+  next_action: string;
+  due_at: string;
+  updated_at?: string;
+  source?: string;
+}
+
+interface DecisionSummary {
+  total: number;
+  highPriority: number;
+  overdue: number;
+  blocked: number;
 }
 
 interface PaginationInfo {
@@ -562,6 +582,9 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [health, setHealth] = useState<Health[]>([]);
+  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [decisionSummary, setDecisionSummary] = useState<DecisionSummary>({ total: 0, highPriority: 0, overdue: 0, blocked: 0 });
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -620,7 +643,7 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoriesRes, healthRes, metricsRes] = await Promise.all([
+        const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoriesRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
           fetch('/api/tasks?page=1&pageSize=20'),
           fetch('/api/pipelines'),
           fetch('/api/events'),
@@ -628,6 +651,7 @@ export default function Dashboard() {
           fetch('/api/memories'),
           fetch('/api/health'),
           fetch('/api/metrics'),
+          fetch('/api/decisions'),
         ]);
 
         const tasksData = await tasksRes.json();
@@ -637,6 +661,7 @@ export default function Dashboard() {
         const memoriesData = await memoriesRes.json();
         const healthData = await healthRes.json();
         const metricsData = await metricsRes.json();
+        const decisionsData = await decisionsRes.json();
 
         if (tasksData.tasks) {
           setTasks(tasksData.tasks);
@@ -654,8 +679,20 @@ export default function Dashboard() {
           setDataValidation(prev => ({ ...prev, health: { valid: validation.valid, warnings: validation.warnings } }));
         }
         if (metricsData.metrics) setMetricsState(metricsData);
+        if (decisionsData.decisions) {
+          setDecisions(decisionsData.decisions);
+          if (decisionsData.summary) {
+            setDecisionSummary(decisionsData.summary);
+          }
+        }
 
-        setLastUpdated(new Date().toISOString());
+        const lastUpdate = new Date().toISOString();
+        setLastUpdated(lastUpdate);
+        
+        // 生成告警
+        const generatedAlerts = aggregateAlerts(healthData.health || [], tasksData.tasks || [], lastUpdate);
+        setAlerts(generatedAlerts);
+        
         setLoading(false);
       } catch (err) {
         setError('无法从数据库加载数据，请检查网络连接');
@@ -1056,6 +1093,32 @@ export default function Dashboard() {
                   </>
                 )}
               </MetricGroup>
+
+              {/* 告警卡片区域 */}
+              {!loading && alerts.length > 0 && (
+                <div className="mb-6">
+                  <AlertCard alerts={alerts} compact={false} />
+                </div>
+              )}
+
+              {/* 决策中心模块 */}
+              {!loading && (
+                <div className="mb-6">
+                  <DecisionCenter 
+                    decisions={decisions} 
+                    summary={decisionSummary}
+                    loading={false}
+                    onRefresh={() => {
+                      fetch('/api/decisions').then(res => res.json()).then(data => {
+                        if (data.decisions) {
+                          setDecisions(data.decisions);
+                          if (data.summary) setDecisionSummary(data.summary);
+                        }
+                      });
+                    }}
+                  />
+                </div>
+              )}
 
               {/* 模块卡片网格 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

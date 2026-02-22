@@ -63,8 +63,11 @@ const ICON_MAP: Record<string, string> = {
   'arrow-up': 'icon-arrow-up',
   'arrow-down': 'icon-arrow-down',
   'arrow-right': 'icon-arrow-right',
+  'arrow-left': 'icon-arrow-left',
   'chevron-left': 'icon-chevron-left',
   'chevron-right': 'icon-chevron-right',
+  'refresh': 'icon-refresh',
+  'copy': 'icon-copy',
   
   // 详情浮窗图标
   'id': 'icon-info',
@@ -119,6 +122,9 @@ const EMOJI_FALLBACK: Record<string, string> = {
   'link': '🔗',
   'chevron-left': '◀',
   'chevron-right': '▶',
+  'arrow-left': '⬅',
+  'refresh': '🔄',
+  'copy': '📋',
 };
 
 export interface IconProps {
