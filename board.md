@@ -4,9 +4,11 @@
 
 ### T-20260222-003 - 任务看板单模块视图改进
 
-**状态**: 进行中  
+**状态**: ✅ 已完成  
 **优先级**: 高  
 **创建时间**: 2026-02-22  
+**完成时间**: 2026-02-22 11:45  
+**提交**: cd27741  
 
 #### 需求描述
 在 mission-control 中改进"任务看板"单模块视图，提供完整列表（不只前 5 条），支持分页/加载更多与筛选。
@@ -40,7 +42,23 @@
 - [x] 至少 1 张截图 (docs/screenshot-dashboard.png, docs/screenshot-taskboard-single.png)
 - [x] 关键 /api/tasks 响应样例 (见下方)
 - [x] npm run build 通过
-- [x] 本地 commit（不 push）
+- [x] 本地 commit（不 push）- commit: `cd27741`
+
+```
+T-20260222-003: 任务看板单模块视图改进 - 分页/筛选/搜索
+
+功能实现:
+- API 支持分页 (page, pageSize), 状态筛选 (status), 搜索 (search), 排序 (sortBy)
+- 前端添加搜索框、状态下拉筛选、排序下拉、视图切换
+- 分页控制：上一页/下一页，显示页码和总页数
+- 单模块视图显示完整列表（无高度限制）
+- 保留点击条目打开 DetailModal 功能
+
+测试:
+- npm run build 通过
+- API 响应验证：分页/筛选/搜索均正常
+- 截图：docs/screenshot-dashboard.png, docs/screenshot-taskboard-single.png
+```
 
 #### API 响应样例
 
