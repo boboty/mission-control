@@ -77,6 +77,8 @@ const ICON_MAP: Record<string, string> = {
   'action': 'icon-action',
   'note': 'icon-note',
   'source': 'icon-source',
+  'tag': 'icon-tag',
+  'link': 'icon-link',
 };
 
 // 备选 emoji 映射 (当 Iconfont 未加载时使用)
@@ -113,6 +115,8 @@ const EMOJI_FALLBACK: Record<string, string> = {
   'action': '➡️',
   'note': '📝',
   'source': '🔗',
+  'tag': '🏷️',
+  'link': '🔗',
   'chevron-left': '◀',
   'chevron-right': '▶',
 };

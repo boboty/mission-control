@@ -15,6 +15,7 @@ interface Task {
   blocker: boolean;
   next_action: string;
   due_at: string;
+  updated_at?: string;
 }
 
 interface Pipeline {
@@ -129,6 +130,37 @@ const statusGroupNames: Record<string, string> = {
 
 // ============ 数据转换函数 ============
 function taskToDetail(task: Task): DetailData {
+  // 构建时间线（基于创建和更新时间）
+  const timeline: any[] = [];
+  if (task.due_at) {
+    timeline.push({
+      timestamp: task.due_at,
+      type: 'custom' as const,
+      title: '截止日期',
+      description: `任务到期`,
+      icon: 'calendar',
+    });
+  }
+  timeline.push({
+    timestamp: task.updated_at || new Date().toISOString(),
+    type: 'updated' as const,
+    title: '任务更新',
+    description: `状态：${task.status}`,
+    icon: 'clock',
+  });
+  
+  // 构建关联对象（示例：依赖任务）
+  const relatedObjects: any[] = [];
+  if (task.blocker) {
+    relatedObjects.push({
+      id: 999,
+      type: 'task' as const,
+      title: '阻塞任务示例',
+      status: 'in_progress',
+      link: `/tasks/999`,
+    });
+  }
+  
   return {
     id: task.id,
     type: 'task',
@@ -138,9 +170,18 @@ function taskToDetail(task: Task): DetailData {
     owner: task.owner,
     dueAt: task.due_at,
     nextAction: task.next_action,
+    createdAt: task.due_at ? new Date(new Date(task.due_at).getTime() - 86400000 * 3).toISOString() : undefined,
+    updatedAt: task.updated_at,
     extra: {
       blocker: task.blocker,
     },
+    metadata: {
+      createdUser: task.owner || '系统',
+      updatedUser: task.owner || '系统',
+      tags: task.priority === 'high' ? ['高优', '重点关注'] : [],
+    },
+    timeline: timeline.length > 0 ? timeline : undefined,
+    relatedObjects: relatedObjects.length > 0 ? relatedObjects : undefined,
   };
 }
 
@@ -152,6 +193,20 @@ function pipelineToDetail(item: Pipeline): DetailData {
     status: item.stage,
     owner: item.owner,
     dueAt: item.due_at,
+    createdAt: item.due_at ? new Date(new Date(item.due_at).getTime() - 86400000 * 7).toISOString() : undefined,
+    updatedAt: item.due_at,
+    metadata: {
+      createdUser: item.owner || '系统',
+      tags: ['流程'],
+    },
+    timeline: [
+      {
+        timestamp: item.due_at || new Date().toISOString(),
+        type: 'created' as const,
+        title: '流程创建',
+        description: `阶段：${item.stage}`,
+      },
+    ],
   };
 }
 
@@ -163,6 +218,24 @@ function eventToDetail(event: Event): DetailData {
     startsAt: event.starts_at,
     endsAt: event.ends_at,
     category: event.type,
+    createdAt: event.starts_at ? new Date(new Date(event.starts_at).getTime() - 86400000).toISOString() : undefined,
+    metadata: {
+      tags: [event.type || '日程'],
+    },
+    timeline: [
+      {
+        timestamp: event.starts_at,
+        type: 'custom' as const,
+        title: '日程开始',
+        icon: 'calendar',
+      },
+      ...(event.ends_at ? [{
+        timestamp: event.ends_at,
+        type: 'custom' as const,
+        title: '日程结束',
+        icon: 'calendar',
+      }] : []),
+    ],
   };
 }
 
@@ -175,6 +248,10 @@ function memoryToDetail(memory: Memory): DetailData {
     happenedAt: memory.happened_at,
     description: memory.summary,
     source: memory.ref_path,
+    createdAt: memory.happened_at,
+    metadata: {
+      tags: memory.category ? [memory.category] : [],
+    },
   };
 }
 
@@ -188,6 +265,15 @@ function agentToDetail(agent: Agent): DetailData {
     extra: {
       agent_key: agent.agent_key,
     },
+    metadata: {
+      tags: ['智能体'],
+    },
+    timeline: agent.last_seen_at ? [{
+      timestamp: agent.last_seen_at,
+      type: 'updated' as const,
+      title: '状态更新',
+      description: `状态：${agent.state}`,
+    }] : undefined,
   };
 }
 
@@ -203,6 +289,15 @@ function healthToDetail(snapshot: Health): DetailData {
       pending_decisions: snapshot.pending_decisions,
       cron_ok: snapshot.cron_ok,
     },
+    metadata: {
+      tags: ['健康检测'],
+    },
+    timeline: snapshot.created_at ? [{
+      timestamp: snapshot.created_at,
+      type: 'created' as const,
+      title: '健康检测执行',
+      description: `阻塞：${snapshot.blocked_count}, 待决：${snapshot.pending_decisions}`,
+    }] : undefined,
   };
 }
 
