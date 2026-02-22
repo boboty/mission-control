@@ -17,12 +17,12 @@ export async function GET() {
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-        COUNT(*) FILTER (WHERE blocker = true) as blocked,
+        COUNT(*) FILTER (WHERE blocker = true AND status != 'done') as blocked,
         COUNT(*) FILTER (WHERE status = 'todo') as todo
       FROM tasks
     `);
 
-    // Metrics from 24 hours ago (using health_snapshots as historical reference)
+    // Metrics from the previous snapshot (health_snapshots as historical reference)
     const historicalMetrics = await client.query(`
       SELECT blocked_count, pending_decisions
       FROM health_snapshots
@@ -32,7 +32,7 @@ export async function GET() {
 
     // Get latest health snapshot for pending decisions
     const latestHealth = await client.query(`
-      SELECT pending_decisions
+      SELECT blocked_count, pending_decisions
       FROM health_snapshots
       ORDER BY created_at DESC
       LIMIT 1
@@ -42,12 +42,13 @@ export async function GET() {
     const historical = historicalMetrics.rows[0];
     const pending = latestHealth.rows[0]?.pending_decisions || 0;
 
-    // Calculate trends (compare with historical or default to 0)
+    // Calculate trends (compare with historical when available)
+    // Note: health_snapshots currently only stores blocked_count & pending_decisions.
     const trends = {
-      total: 0, // No historical total, default to 0
-      in_progress: historical ? current.in_progress - (historical.blocked_count || 0) : 0,
+      total: 0,
+      in_progress: 0,
       blocked: historical ? current.blocked - (historical.blocked_count || 0) : 0,
-      pending: 0, // No historical pending, default to 0
+      pending: historical ? pending - (historical.pending_decisions || 0) : 0,
     };
 
     return NextResponse.json({
