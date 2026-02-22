@@ -1,0 +1,357 @@
+@import "tailwindcss";
+@import "../styles/variables.css";
+
+/* 基础重置 */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: var(--font-size-base);
+  line-height: var(--leading-normal);
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+/* ========== Iconfont 图标样式 ========== */
+.icon {
+  display: inline-block;
+  vertical-align: middle;
+  fill: currentColor;
+}
+
+/* ========== 卡片系统 - 暗色模式修复（第二轮） ========== */
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-medium);
+  background: var(--bg-tertiary);
+}
+
+/* 暗色模式下卡片层级更清晰 */
+@media (prefers-color-scheme: dark) {
+  .card {
+    background: var(--bg-tertiary);
+    border-color: var(--border-medium);
+  }
+  
+  .card:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-dark);
+  }
+}
+
+/* 卡片头部 */
+.card-header {
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* ========== 状态标签 - 暗色模式修复 ========== */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-fast);
+}
+
+/* ========== 按钮基础样式 ========== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn-soft {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.btn-soft:hover {
+  background: var(--color-primary-hover);
+  color: white;
+}
+
+/* ========== 滚动条美化 - 暗色模式 ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate-400);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-500);
+}
+
+/* ========== 动画 ========== */
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* 骨架屏动画 - 暗色模式适配 */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-slate-200) 0%,
+    var(--color-slate-300) 50%,
+    var(--color-slate-200) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--bg-tertiary) 0%,
+      var(--bg-elevated) 50%,
+      var(--bg-tertiary) 100%
+    );
+  }
+}
+
+/* ========== 工具类 ========== */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* ========== 响应式容器 ========== */
+.container {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 var(--space-4);
+  }
+}
+
+/* ========== 网格布局辅助 ========== */
+.grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+
+/* ========== 渐变背景 - 暗色模式适配 ========== */
+.gradient-soft {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+}
+
+.gradient-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .gradient-soft {
+    background: linear-gradient(135deg, #1e293b 0%, #312e81 100%);
+  }
+  
+  .gradient-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  }
+}
+
+/* ========== 分隔线 - 暗色模式柔和 ========== */
+.divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: var(--space-4) 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .divider {
+    background: var(--border-medium);
+    opacity: 0.6;
+  }
+}
+
+/* ========== 焦点样式 ========== */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ========== 选择样式 ========== */
+::selection {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::selection {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+}
+
+/* ========== 输入框/表单 - 暗色模式 ========== */
+input,
+textarea,
+select {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  transition: all var(--transition-fast);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+/* ========== 空状态 - 暗色模式 ========== */
+.empty-state {
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-medium);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+/* ========== 徽标/标签 - 暗色模式 ========== */
+.badge-success {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+}
+
+.badge-warning {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+}
+
+.badge-error {
+  background: var(--badge-error-bg);
+  color: var(--badge-error-text);
+}
+
+.badge-info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+}
+
+.badge-slate {
+  background: var(--badge-slate-bg);
+  color: var(--badge-slate-text);
+}
+
+/* ========== 链接样式 ========== */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+/* ========== 代码块 ========== */
+code {
+  background: var(--bg-tertiary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875em;
+  color: var(--text-primary);
+}
+
+/* ========== 表格样式 ========== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+}
+
+th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+}
+
+tr:hover {
+  background: var(--bg-tertiary);
+}
