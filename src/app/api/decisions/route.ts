@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   try {
     await client.connect();
 
-    // 查询待决策项（默认口径）：blocked 优先
+    // 查询待决策项（默认口径）：blocked 优先，排除已完成
     // 说明：后续如需拓展，可加上“高优 todo 且 next_action 非空”作为次级入口。
     const decisionsQuery = `
       SELECT 
@@ -28,6 +28,7 @@ export async function GET(request: Request) {
         source
       FROM tasks
       WHERE blocker = true
+        AND status != 'done'
       ORDER BY 
         updated_at DESC NULLS LAST,
         due_at ASC NULLS LAST
@@ -36,15 +37,16 @@ export async function GET(request: Request) {
 
     const decisionsResult = await client.query(decisionsQuery);
 
-    // 查询统计信息
+    // 查询统计信息（排除已完成）
     const summaryQuery = `
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE priority = 'high') as high_priority,
         COUNT(*) FILTER (WHERE due_at < NOW()) as overdue,
-        COUNT(*) FILTER (WHERE blocker = true) as blocked
+        COUNT(*) FILTER (WHERE blocker = true AND status != 'done') as blocked
       FROM tasks
       WHERE blocker = true
+        AND status != 'done'
     `;
 
     const summaryResult = await client.query(summaryQuery);
