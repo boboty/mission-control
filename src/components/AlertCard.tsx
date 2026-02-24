@@ -192,8 +192,9 @@ export function aggregateAlerts(
   }
 
   // 长时间未更新告警（stale）
-  if (lastUpdated) {
-    const lastUpdateTime = new Date(lastUpdated).getTime();
+  const syncBase = latestHealth?.last_sync_at || latestHealth?.created_at || lastUpdated;
+  if (syncBase) {
+    const lastUpdateTime = new Date(syncBase).getTime();
     const now = Date.now();
     const hoursSinceUpdate = (now - lastUpdateTime) / (1000 * 60 * 60);
 
@@ -204,7 +205,7 @@ export function aggregateAlerts(
         level: 'warning',
         title: '数据长时间未更新',
         message: `数据已超过 ${Math.floor(hoursSinceUpdate)} 小时未同步，请检查数据源连接`,
-        timestamp: lastUpdated,
+        timestamp: syncBase,
         action: {
           label: '手动刷新',
           onClick: () => window.location.reload(),
@@ -217,7 +218,7 @@ export function aggregateAlerts(
         level: 'info',
         title: '数据更新延迟',
         message: `数据已超过 ${Math.floor(hoursSinceUpdate)} 小时未同步`,
-        timestamp: lastUpdated,
+        timestamp: syncBase,
       });
     }
   }

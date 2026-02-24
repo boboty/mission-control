@@ -7,15 +7,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  // 解析查询参数
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get('page') || '1', 10);
   const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
-  const status = searchParams.get('status'); // 状态筛选：todo/in_progress/blocked/done
-  const search = searchParams.get('search'); // 搜索：按标题或 ID
-  const sortBy = searchParams.get('sortBy') || 'default'; // 排序：default/priority/dueDate/status
+  const status = searchParams.get('status');
+  const search = searchParams.get('search');
+  const sortBy = searchParams.get('sortBy') || 'default';
 
-  // 验证参数
   const safePage = Math.max(1, page);
   const safePageSize = Math.min(100, Math.max(1, pageSize));
   const offset = (safePage - 1) * safePageSize;
@@ -25,21 +23,17 @@ export async function GET(request: Request) {
   try {
     await client.connect();
 
-    // 构建 WHERE 条件
     const whereClauses: string[] = [];
     const queryParams: any[] = [];
     let paramIndex = 1;
 
-    // 状态筛选
     if (status) {
       whereClauses.push(`status = $${paramIndex}`);
       queryParams.push(status);
       paramIndex++;
     }
 
-    // 搜索（标题或 ID）
     if (search) {
-      // 检查是否是数字 ID
       const searchId = parseInt(search, 10);
       if (!isNaN(searchId)) {
         whereClauses.push(`(id = $${paramIndex} OR title ILIKE $${paramIndex + 1})`);
@@ -54,7 +48,6 @@ export async function GET(request: Request) {
 
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // 构建 ORDER BY
     let orderByClause = '';
     switch (sortBy) {
       case 'priority':
@@ -70,12 +63,11 @@ export async function GET(request: Request) {
         orderByClause = 'ORDER BY CASE status WHEN \'done\' THEN 3 WHEN \'in_progress\' THEN 2 ELSE 1 END, CASE priority WHEN \'high\' THEN 1 WHEN \'medium\' THEN 2 ELSE 3 END, due_at ASC NULLS LAST';
     }
 
-    // 查询总数（用于分页）
-    const countQuery = `SELECT COUNT(*) as total FROM tasks ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) as total, MAX(updated_at) as data_updated_at FROM tasks ${whereClause}`;
     const countResult = await client.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total, 10);
+    const now = new Date().toISOString();
 
-    // 查询数据
     const dataQuery = `
       SELECT id, title, status, priority, owner, blocker, next_action, due_at, source, updated_at
       FROM tasks
@@ -100,6 +92,11 @@ export async function GET(request: Request) {
         search,
         sortBy,
       },
+      data_source: 'supabase',
+      // last_sync_at: when this API successfully fetched from Supabase
+      last_sync_at: now,
+      // data_updated_at: last time underlying tasks data changed
+      data_updated_at: countResult.rows[0].data_updated_at,
     });
   } catch (error) {
     console.error('Failed to fetch tasks:', error);

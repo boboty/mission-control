@@ -23,16 +23,18 @@ const navItems: NavItem[] = [
   { key: 'tasks', label: '任务看板', icon: 'tasks' },
   { key: 'pipelines', label: '流程管线', icon: 'pipelines' },
   { key: 'events', label: '日历', icon: 'events' },
-  { key: 'memories', label: '记忆归档', icon: 'memories' },
+  { key: 'memory_topics', label: '记忆主题', icon: 'memories' },
   { key: 'agents', label: '团队概览', icon: 'agents' },
   { key: 'health', label: '运行健康', icon: 'health' },
 ];
 
 export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed = false, onToggle }: LeftNavProps) {
   const [blockedCount, setBlockedCount] = useState<number>(0);
+  const [clientTime, setClientTime] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
+
     async function fetchBlockedCount() {
       try {
         const res = await fetch('/api/tasks?page=1&pageSize=1&status=blocked');
@@ -43,11 +45,22 @@ export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed 
         // ignore
       }
     }
+
+    function updateClientTime() {
+      if (cancelled) return;
+      setClientTime(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+    }
+
     fetchBlockedCount();
-    const t = setInterval(fetchBlockedCount, 60_000);
+    updateClientTime();
+
+    const t1 = setInterval(fetchBlockedCount, 60_000);
+    const t2 = setInterval(updateClientTime, 60_000);
+
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearInterval(t1);
+      clearInterval(t2);
     };
   }, []);
 
@@ -127,7 +140,7 @@ export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed 
             <span>系统正常</span>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-1">
-            更新于 {new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+            更新于 {clientTime || '—'}
           </p>
         </div>
       )}

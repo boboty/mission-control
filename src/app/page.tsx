@@ -57,6 +57,14 @@ interface Health {
   pending_decisions: number;
   cron_ok: boolean;
   created_at: string;
+  last_sync_at?: string;
+}
+
+interface MemoryTopic {
+  slug: string;
+  title: string;
+  ref_path: string;
+  summary?: string;
 }
 
 interface Decision {
@@ -569,7 +577,7 @@ const MODULE_CONFIG = [
   { name: '任务看板', icon: 'tasks', color: 'from-blue-500 to-blue-600', key: 'tasks' },
   { name: '流程管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
   { name: '日历', icon: 'events', color: 'from-emerald-500 to-emerald-600', key: 'events' },
-  { name: '记忆归档', icon: 'memories', color: 'from-amber-500 to-amber-600', key: 'memories' },
+  { name: '记忆主题', icon: 'memories', color: 'from-orange-500 to-orange-600', key: 'memory_topics' },
   { name: '团队概览', icon: 'agents', color: 'from-fuchsia-500 to-fuchsia-600', key: 'agents' },
   { name: '运行健康', icon: 'health', color: 'from-rose-500 to-rose-600', key: 'health' },
 ];
@@ -580,14 +588,17 @@ export default function Dashboard() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [memories, setMemories] = useState<Memory[]>([]);
+  // memories (DB table) UI removed; keep API for potential future use.
   const [health, setHealth] = useState<Health[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [memoryTopics, setMemoryTopics] = useState<MemoryTopic[]>([]);
+  const [memoryTopicsLoading, setMemoryTopicsLoading] = useState(false);
   const [decisionSummary, setDecisionSummary] = useState<DecisionSummary>({ total: 0, highPriority: 0, overdue: 0, blocked: 0 });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [dataSource] = useState('Supabase');
   
   // 任务看板控制状态
   const [taskSortBy, setTaskSortBy] = useState<'default' | 'priority' | 'dueDate' | 'status'>('default');
@@ -643,12 +654,12 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoriesRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
+        const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
           fetch('/api/tasks?page=1&pageSize=20'),
           fetch('/api/pipelines'),
           fetch('/api/events'),
           fetch('/api/agents'),
-          fetch('/api/memories'),
+          fetch('/api/memory-topics'),
           fetch('/api/health'),
           fetch('/api/metrics'),
           fetch('/api/decisions'),
@@ -658,7 +669,7 @@ export default function Dashboard() {
         const pipelinesData = await pipelinesRes.json();
         const eventsData = await eventsRes.json();
         const agentsData = await agentsRes.json();
-        const memoriesData = await memoriesRes.json();
+        const memoryTopicsData = await memoryTopicsRes.json();
         const healthData = await healthRes.json();
         const metricsData = await metricsRes.json();
         const decisionsData = await decisionsRes.json();
@@ -672,7 +683,9 @@ export default function Dashboard() {
         if (pipelinesData.pipelines) setPipelines(pipelinesData.pipelines);
         if (eventsData.events) setEvents(eventsData.events);
         if (agentsData.agents) setAgents(agentsData.agents);
-        if (memoriesData.memories) setMemories(memoriesData.memories);
+        if (memoryTopicsData?.topics) {
+          setMemoryTopics(memoryTopicsData.topics);
+        }
         if (healthData.health) {
           setHealth(healthData.health);
           const validation = validateData('health', healthData.health);
@@ -686,7 +699,18 @@ export default function Dashboard() {
           }
         }
 
-        const lastUpdate = new Date().toISOString();
+        const syncCandidates = [
+          tasksData?.last_sync_at,
+          pipelinesData?.last_sync_at,
+          eventsData?.last_sync_at,
+          agentsData?.last_sync_at,
+          healthData?.last_sync_at,
+          metricsData?.last_sync_at,
+          decisionsData?.last_sync_at,
+        ].filter(Boolean);
+        const lastUpdate = syncCandidates.length > 0
+          ? syncCandidates.sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0]
+          : new Date().toISOString();
         setLastUpdated(lastUpdate);
         
         // 生成告警
@@ -781,7 +805,7 @@ export default function Dashboard() {
         );
       case 'pipelines':
         if (pipelines.length === 0) {
-          return <EmptyState moduleType="pipelines" icon="empty-pipeline" title="暂无流程" description="当前没有进行中的流程项目" />;
+          return <EmptyState moduleType="pipelines" icon="empty-pipeline" title="暂无流程" description="当前没有进行中的流程项目" action={<button className="btn btn-primary">新建流程</button>} />;
         }
         return (
           <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
@@ -796,7 +820,7 @@ export default function Dashboard() {
         );
       case 'events':
         if (events.length === 0) {
-          return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" />;
+          return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" action={<button className="btn btn-primary">新建日程</button>} />;
         }
         return (
           <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
@@ -805,21 +829,6 @@ export default function Dashboard() {
                 key={event.id} 
                 event={event} 
                 onClick={() => openDetail(eventToDetail(event))}
-              />
-            ))}
-          </div>
-        );
-      case 'memories':
-        if (memories.length === 0) {
-          return <EmptyState moduleType="memories" icon="empty-archive" title="暂无记录" description="还没有归档的记忆" />;
-        }
-        return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
-            {memories.map(memory => (
-              <MemoryItem 
-                key={memory.id} 
-                memory={memory} 
-                onClick={() => openDetail(memoryToDetail(memory))}
               />
             ))}
           </div>
@@ -836,6 +845,49 @@ export default function Dashboard() {
                 agent={agent} 
                 onClick={() => openDetail(agentToDetail(agent))}
               />
+            ))}
+          </div>
+        );
+      case 'memory_topics':
+        if (memoryTopicsLoading) {
+          return <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>;
+        }
+        if (memoryTopics.length === 0) {
+          return <EmptyState moduleType="memories" icon="empty-archive" title="暂无主题" description="memory/topics 下还没有主题文件" />;
+        }
+        return (
+          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            {memoryTopics.map((t) => (
+              <ClickableItem
+                key={t.slug}
+                onClick={async () => {
+                  try {
+                    setMemoryTopicsLoading(true);
+                    const res = await fetch(`/api/memory-topics/${t.slug}`);
+                    const data = await res.json();
+                    openDetail({
+                      id: 0,
+                      type: 'memory',
+                      title: t.title || t.slug,
+                      category: 'topic',
+                      description: data?.content || '',
+                      source: data?.ref_path || t.ref_path,
+                      createdAt: new Date().toISOString(),
+                      metadata: { tags: ['memory/topics'] },
+                    } as any);
+                  } finally {
+                    setMemoryTopicsLoading(false);
+                  }
+                }}
+                className="-mx-2 px-2 rounded-lg"
+              >
+                <div className="py-2.5 border-b border-[var(--border-light)] dark:border-[var(--border-medium)] last:border-0">
+                  <div className="text-sm font-medium text-[var(--text-primary)]">{t.title || t.slug}</div>
+                  <div className="text-xs text-[var(--text-muted)] mt-1 truncate">
+                    {t.summary || t.ref_path}
+                  </div>
+                </div>
+              </ClickableItem>
             ))}
           </div>
         );
@@ -959,17 +1011,14 @@ export default function Dashboard() {
                   {activeModule === 'dashboard' ? '任务控制中心' : MODULE_CONFIG.find(m => m.key === activeModule)?.name || '模块'}
                 </h1>
                 <p className="text-[var(--text-secondary)] mt-2 text-sm">
-                  {activeModule === 'dashboard' ? (
-                    <>
-                      实时数据看板 · Supabase 驱动
-                      {lastUpdated && (
-                        <span className="ml-3 text-[var(--text-muted)]">
-                          · 更新于 {formatUpdateTime(lastUpdated)}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    '单模块视图 · 完整列表'
+                  数据源：{dataSource}
+                  {lastUpdated && (
+                    <span className="ml-3 text-[var(--text-muted)]">
+                      · 最近同步：{formatUpdateTime(lastUpdated)}
+                    </span>
+                  )}
+                  {activeModule !== 'dashboard' && (
+                    <span className="ml-3 text-[var(--text-muted)]">· 单模块视图</span>
                   )}
                 </p>
               </div>
@@ -1113,6 +1162,7 @@ export default function Dashboard() {
                         if (data.decisions) {
                           setDecisions(data.decisions);
                           if (data.summary) setDecisionSummary(data.summary);
+                          if (data.last_sync_at) setLastUpdated(data.last_sync_at);
                         }
                       });
                     }}
@@ -1154,7 +1204,7 @@ export default function Dashboard() {
                               subtitle={
                                 module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
                                 module.key === 'events' ? `共 ${events.length} 项日程` :
-                                module.key === 'memories' ? `共 ${memories.length} 条记录` :
+                                module.key === 'memory_topics' ? `共 ${memoryTopics.length} 个主题` :
                                 module.key === 'agents' ? `共 ${agents.length} 个智能体` :
                                 `共 ${health.length} 次检测`
                               }
@@ -1182,17 +1232,17 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-[var(--text-primary)]">Mission Control</h3>
-                    <p className="text-xs text-[var(--text-muted)]">MVP · 全部模块已连接实时数据</p>
+                    <p className="text-xs text-[var(--text-muted)]">MVP · 实时任务总览</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4 text-xs text-[var(--text-muted)]">
                   <span className="flex items-center">
                     <span className="w-2 h-2 bg-[var(--color-success)] rounded-full mr-2" />
-                    Supabase 已连接
+                    数据源：{dataSource}
                   </span>
                   <span className="flex items-center">
                     <span className="w-2 h-2 bg-[var(--color-primary)] rounded-full mr-2" />
-                    响应式布局
+                    {lastUpdated ? `最近同步：${formatUpdateTime(lastUpdated)}` : '等待首次同步'}
                   </span>
                 </div>
               </div>

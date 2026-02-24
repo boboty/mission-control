@@ -12,17 +12,16 @@ export async function GET() {
   try {
     await client.connect();
 
-    // Current metrics
     const currentMetrics = await client.query(`
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
         COUNT(*) FILTER (WHERE blocker = true AND status != 'done') as blocked,
-        COUNT(*) FILTER (WHERE status = 'todo') as todo
+        COUNT(*) FILTER (WHERE blocker = true AND status != 'done') as pending,
+        MAX(updated_at) as data_updated_at
       FROM tasks
     `);
 
-    // Metrics from the previous snapshot (health_snapshots as historical reference)
     const historicalMetrics = await client.query(`
       SELECT blocked_count, pending_decisions
       FROM health_snapshots
@@ -30,33 +29,26 @@ export async function GET() {
       OFFSET 1 LIMIT 1
     `);
 
-    // Get latest health snapshot for pending decisions
-    const latestHealth = await client.query(`
-      SELECT blocked_count, pending_decisions
-      FROM health_snapshots
-      ORDER BY created_at DESC
-      LIMIT 1
-    `);
-
     const current = currentMetrics.rows[0];
     const historical = historicalMetrics.rows[0];
-    const pending = latestHealth.rows[0]?.pending_decisions || 0;
+    const now = new Date().toISOString();
 
-    // Calculate trends (compare with historical when available)
-    // Note: health_snapshots currently only stores blocked_count & pending_decisions.
+    const currentBlocked = parseInt(current.blocked, 10) || 0;
+    const currentPending = parseInt(current.pending, 10) || 0;
+
     const trends = {
       total: 0,
       in_progress: 0,
-      blocked: historical ? current.blocked - (historical.blocked_count || 0) : 0,
-      pending: historical ? pending - (historical.pending_decisions || 0) : 0,
+      blocked: historical ? currentBlocked - (historical.blocked_count || 0) : 0,
+      pending: historical ? currentPending - (historical.pending_decisions || 0) : 0,
     };
 
     return NextResponse.json({
       metrics: {
-        total: parseInt(current.total) || 0,
-        inProgress: parseInt(current.in_progress) || 0,
-        blocked: parseInt(current.blocked) || 0,
-        pending: pending,
+        total: parseInt(current.total, 10) || 0,
+        inProgress: parseInt(current.in_progress, 10) || 0,
+        blocked: currentBlocked,
+        pending: currentPending,
       },
       trends: {
         total: trends.total,
@@ -64,6 +56,9 @@ export async function GET() {
         blocked: trends.blocked,
         pending: trends.pending,
       },
+      data_source: 'supabase',
+      last_sync_at: now,
+      data_updated_at: current.data_updated_at,
     });
   } catch (error) {
     console.error('Failed to fetch metrics:', error);

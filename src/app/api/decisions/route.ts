@@ -12,8 +12,7 @@ export async function GET(request: Request) {
   try {
     await client.connect();
 
-    // 查询待决策项（默认口径）：blocked 优先，排除已完成
-    // 说明：后续如需拓展，可加上“高优 todo 且 next_action 非空”作为次级入口。
+    // 决策口径：所有 blocker=true 且未完成任务
     const decisionsQuery = `
       SELECT 
         id,
@@ -27,8 +26,8 @@ export async function GET(request: Request) {
         updated_at,
         source
       FROM tasks
-      WHERE blocker = true
-        AND status != 'done'
+      WHERE status != 'done'
+        AND blocker = true
       ORDER BY 
         updated_at DESC NULLS LAST,
         due_at ASC NULLS LAST
@@ -37,21 +36,24 @@ export async function GET(request: Request) {
 
     const decisionsResult = await client.query(decisionsQuery);
 
-    // 查询统计信息（排除已完成）
+    // 汇总口径与列表保持一致
     const summaryQuery = `
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE priority = 'high') as high_priority,
         COUNT(*) FILTER (WHERE due_at < NOW()) as overdue,
-        COUNT(*) FILTER (WHERE blocker = true AND status != 'done') as blocked
+        COUNT(*) FILTER (WHERE blocker = true) as blocked,
+        COUNT(*) FILTER (WHERE NULLIF(BTRIM(next_action), '') IS NOT NULL) as with_next_action,
+        COUNT(*) FILTER (WHERE NULLIF(BTRIM(next_action), '') IS NULL) as missing_next_action,
+        MAX(updated_at) as data_updated_at
       FROM tasks
-      WHERE blocker = true
-        AND status != 'done'
+      WHERE status != 'done'
+        AND blocker = true
     `;
 
     const summaryResult = await client.query(summaryQuery);
+    const now = new Date().toISOString();
 
-    // 转换数据格式
     const decisions = decisionsResult.rows.map(row => ({
       id: row.id,
       title: row.title,
@@ -70,12 +72,17 @@ export async function GET(request: Request) {
       highPriority: parseInt(summaryResult.rows[0].high_priority) || 0,
       overdue: parseInt(summaryResult.rows[0].overdue) || 0,
       blocked: parseInt(summaryResult.rows[0].blocked) || 0,
+      withNextAction: parseInt(summaryResult.rows[0].with_next_action) || 0,
+      missingNextAction: parseInt(summaryResult.rows[0].missing_next_action) || 0,
     };
 
     return NextResponse.json({
       decisions,
       summary,
       count: decisions.length,
+      data_source: 'supabase',
+      last_sync_at: now,
+      data_updated_at: summaryResult.rows[0].data_updated_at,
     });
   } catch (error) {
     console.error('Failed to fetch decisions:', error);

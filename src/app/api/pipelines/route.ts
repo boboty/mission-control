@@ -17,7 +17,12 @@ export async function GET() {
       ORDER BY due_at ASC NULLS LAST
       LIMIT 20
     `);
-    return NextResponse.json({ pipelines: result.rows, count: result.rows.length });
+    return NextResponse.json({
+      pipelines: result.rows,
+      count: result.rows.length,
+      data_source: 'supabase',
+      last_sync_at: result.rows[0]?.updated_at || null,
+    });
   } catch (error) {
     console.error('Failed to fetch pipelines:', error);
     return NextResponse.json({ error: 'Failed to fetch pipelines' }, { status: 500 });

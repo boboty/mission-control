@@ -18,7 +18,12 @@ export async function GET() {
       ORDER BY starts_at ASC
       LIMIT 20
     `);
-    return NextResponse.json({ events: result.rows, count: result.rows.length });
+    return NextResponse.json({
+      events: result.rows,
+      count: result.rows.length,
+      data_source: 'supabase',
+      last_sync_at: result.rows[0]?.starts_at || null,
+    });
   } catch (error) {
     console.error('Failed to fetch events:', error);
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
