@@ -30,6 +30,7 @@ interface DecisionCenterProps {
   summary: DecisionSummary;
   loading?: boolean;
   onRefresh?: () => void;
+  onResolve?: (decision: Decision) => void;
 }
 
 // 格式化相对时间
@@ -169,11 +170,13 @@ function copyToClipboard(text: string): boolean {
 function DecisionItem({ 
   decision, 
   onClick, 
-  onCopy 
+  onCopy,
+  onResolve 
 }: { 
   decision: Decision; 
   onClick: () => void;
   onCopy: (e: React.MouseEvent) => void;
+  onResolve?: (decision: Decision) => void;
 }) {
   const isHighPriority = decision.priority === 'high';
   const isBlocked = decision.blocker;
@@ -266,6 +269,16 @@ function DecisionItem({
       {/* 操作按钮 */}
       <div className="flex-shrink-0 ml-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onResolve?.(decision);
+          }}
+          className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--color-success)] hover:bg-[var(--bg-secondary)] transition-colors"
+          title="标记已解决"
+        >
+          <Icon name="check" size={14} />
+        </button>
+        <button
           onClick={onCopy}
           className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
           title="复制上下文"
@@ -308,7 +321,8 @@ export function DecisionCenter({
   decisions, 
   summary, 
   loading = false,
-  onRefresh 
+  onRefresh,
+  onResolve
 }: DecisionCenterProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedDecision, setSelectedDecision] = useState<DetailData | null>(null);
@@ -410,6 +424,7 @@ export function DecisionCenter({
                 decision={decision}
                 onClick={() => handleOpenDetail(decision)}
                 onCopy={(e) => handleCopyContext(e, decision)}
+                onResolve={onResolve}
               />
             ))}
           </div>

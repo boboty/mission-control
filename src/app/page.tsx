@@ -1317,6 +1317,29 @@ export default function Dashboard() {
                         }
                       });
                     }}
+                    onResolve={async (decision) => {
+                      // 标记为 done
+                      try {
+                        const res = await fetch('/api/tasks', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ taskId: decision.id, status: 'done', actor: 'user', meta: { reason: 'decision_resolved' } }),
+                        });
+                        if (res.ok) {
+                          // 刷新决策列表
+                          fetch('/api/decisions').then(r => r.json()).then(data => {
+                            if (data.decisions) {
+                              setDecisions(data.decisions);
+                              if (data.summary) setDecisionSummary(data.summary);
+                            }
+                          });
+                          // 刷新任务列表
+                          fetchTasks();
+                        }
+                      } catch (e) {
+                        console.error('Failed to resolve decision:', e);
+                      }
+                    }}
                   />
                 </div>
               )}
