@@ -204,7 +204,7 @@ export function aggregateAlerts(
         type: 'stale',
         level: 'warning',
         title: '数据长时间未更新',
-        message: `数据已超过 ${Math.floor(hoursSinceUpdate)} 小时未同步，请检查数据源连接`,
+        message: `数据更新时间距今 ${Math.floor(hoursSinceUpdate)} 小时，请检查数据源连接`,
         timestamp: syncBase,
         action: {
           label: '手动刷新',
@@ -217,7 +217,7 @@ export function aggregateAlerts(
         type: 'stale',
         level: 'info',
         title: '数据更新延迟',
-        message: `数据已超过 ${Math.floor(hoursSinceUpdate)} 小时未同步`,
+        message: `数据更新时间距今 ${Math.floor(hoursSinceUpdate)} 小时`,
         timestamp: syncBase,
       });
     }

@@ -64,9 +64,23 @@ CREATE TABLE IF NOT EXISTS health_snapshots (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Task Events (for status change history)
+CREATE TABLE IF NOT EXISTS task_events (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  event_type VARCHAR(50) DEFAULT 'status_change',
+  from_status VARCHAR(50),
+  to_status VARCHAR(50) NOT NULL,
+  actor VARCHAR(100),
+  meta JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_pipelines_stage ON pipelines(stage);
 CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at);
 CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+CREATE INDEX IF NOT EXISTS idx_task_events_task_id ON task_events(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_events_created_at ON task_events(created_at);

@@ -1,6 +1,64 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
 
+export async function PATCH(request: Request) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+  }
+
+  const body = await request.json();
+  const { taskId, status, actor = 'system', meta } = body;
+
+  if (!taskId || !status) {
+    return NextResponse.json({ error: 'taskId and status are required' }, { status: 400 });
+  }
+
+  const client = new Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+
+  try {
+    await client.connect();
+    await client.query('BEGIN');
+
+    // Get current task status
+    const taskResult = await client.query('SELECT status FROM tasks WHERE id = $1', [taskId]);
+    if (taskResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    const fromStatus = taskResult.rows[0].status;
+
+    // Update task status
+    await client.query(
+      'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2',
+      [status, taskId]
+    );
+
+    // Insert event record
+    await client.query(
+      `INSERT INTO task_events (task_id, event_type, from_status, to_status, actor, meta, created_at)
+       VALUES ($1, 'status_change', $2, $3, $4, $5, NOW())`,
+      [taskId, fromStatus, status, actor, meta ? JSON.stringify(meta) : null]
+    );
+
+    await client.query('COMMIT');
+
+    return NextResponse.json({
+      success: true,
+      taskId,
+      fromStatus,
+      toStatus: status,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Failed to update task status:', error);
+    return NextResponse.json({ error: 'Failed to update task status' }, { status: 500 });
+  } finally {
+    await client.end();
+  }
+}
+
 export async function GET(request: Request) {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {

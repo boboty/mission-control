@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, PriorityBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert } from '../components';
 import { Icon } from '../components/Icon';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
+import { DndContext, DragEndEvent, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // ============ 类型定义 ============
 interface Task {
@@ -138,6 +141,15 @@ const statusGroupNames: Record<string, string> = {
   done: '已完成',
   blocked: '已阻塞',
 };
+
+// 看板列定义
+const kanbanColumns = [
+  { id: 'todo', title: '待办', color: 'bg-slate-500' },
+  { id: 'in_progress', title: '进行中', color: 'bg-blue-500' },
+  { id: 'checklist', title: '检查中', color: 'bg-amber-500' },
+  { id: 'blocked', title: '阻塞', color: 'bg-rose-500' },
+  { id: 'done', title: '已完成', color: 'bg-emerald-500' },
+];
 
 // 状态选项
 const statusOptions = [
@@ -342,6 +354,27 @@ function SystemStatus({ health }: { health: Health[] }) {
       <span className="text-sm font-medium">
         {isHealthy ? '系统正常' : '需要关注'}
       </span>
+    </div>
+  );
+}
+
+// 可拖拽任务项
+function SortableTaskItem({ task, onClick }: { task: Task; onClick?: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const isBlocked = task.blocker || task.status === 'blocked';
+  
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      {...attributes} 
+      {...listeners}
+      className={`p-2 mb-2 rounded-lg cursor-grab active:cursor-grabbing bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] border border-[var(--border-light)] dark:border-[var(--border-medium)] hover:border-[var(--color-primary)]/50 transition-colors ${isDragging ? 'opacity-50' : ''}`}
+      onClick={onClick}
+    >
+      <div className="text-xs text-[var(--text-primary)] line-clamp-2">{task.title}</div>
+      {task.priority === 'high' && <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]">高优</span>}
     </div>
   );
 }
@@ -602,7 +635,7 @@ export default function Dashboard() {
   
   // 任务看板控制状态
   const [taskSortBy, setTaskSortBy] = useState<'default' | 'priority' | 'dueDate' | 'status'>('default');
-  const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped'>('list');
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped' | 'kanban'>('list');
   
   // 任务筛选和分页状态
   const [taskSearch, setTaskSearch] = useState('');
@@ -610,6 +643,67 @@ export default function Dashboard() {
   const [taskPage, setTaskPage] = useState(1);
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
+  
+  // 拖拽状态
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const taskSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+  
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+  
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    
+    if (!over) return;
+    
+    const taskId = Number(active.id);
+    // 判断拖拽到哪一列
+    let newStatus = '';
+    for (const col of kanbanColumns) {
+      const colTasks = groupTasksByStatus(tasks)[col.id] || [];
+      if (colTasks.some((t: Task) => t.id === Number(over.id))) {
+        newStatus = col.id;
+        break;
+      }
+    }
+    
+    if (!newStatus) {
+      // 可能拖到了列标题，检查 over.id 是否是列 id
+      if (kanbanColumns.some(col => col.id === String(over.id))) {
+        newStatus = String(over.id);
+      }
+    }
+    
+    if (!newStatus) return;
+    
+    const currentTask = tasks.find(t => t.id === taskId);
+    if (!currentTask || currentTask.status === newStatus) return;
+    
+    // 乐观更新
+    const oldStatus = currentTask.status;
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, status: newStatus, actor: 'user', meta: { reason: 'drag' } }),
+      });
+      
+      if (!res.ok) {
+        // 回滚
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: oldStatus } : t));
+        alert('移动任务失败');
+      }
+    } catch (e) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: oldStatus } : t));
+      alert('移动任务失败');
+    }
+  };
   
   // 详情浮窗状态
   const [detailOpen, setDetailOpen] = useState(false);
@@ -780,6 +874,53 @@ export default function Dashboard() {
               ))}
               {taskPagination && <Pagination pagination={taskPagination} onPageChange={handleTaskPageChange} />}
             </div>
+          );
+        }
+        
+        // 看板视图 (Kanban)
+        if (taskViewMode === 'kanban') {
+          const groupedTasks = groupTasksByStatus(tasks);
+          return (
+            <DndContext 
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              sensors={taskSensors}
+            >
+              <div className="grid grid-cols-5 gap-3 overflow-x-auto">
+                {kanbanColumns.map(col => (
+                  <div key={col.id} className="min-w-[200px]">
+                    <div className={`${col.color} text-white text-xs font-medium px-3 py-2 rounded-t-lg flex items-center justify-between`}>
+                      <span>{col.title}</span>
+                      <span className="opacity-75">{groupedTasks[col.id]?.length || 0}</span>
+                    </div>
+                    <div className="bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-b-lg p-2 min-h-[200px] max-h-[400px] overflow-y-auto">
+                      <SortableContext items={groupedTasks[col.id]?.map(t => t.id) || []} strategy={verticalListSortingStrategy}>
+                        {groupedTasks[col.id]?.map(task => (
+                          <SortableTaskItem 
+                            key={task.id} 
+                            task={task}
+                            onClick={() => openDetail(taskToDetail(task))}
+                          />
+                        ))}
+                      </SortableContext>
+                      {(!groupedTasks[col.id] || groupedTasks[col.id].length === 0) && (
+                        <div className="text-center text-xs text-[var(--text-muted)] py-4">暂无</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <DragOverlay>
+                {activeId ? (
+                  <div className="bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3 rounded-lg shadow-lg border border-[var(--color-primary)] opacity-90">
+                    <span className="text-sm text-[var(--text-primary)]">
+                      {tasks.find(t => t.id === activeId)?.title?.substring(0, 30)}
+                    </span>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           );
         }
         
@@ -983,6 +1124,16 @@ export default function Dashboard() {
             }`}
           >
             分组
+          </button>
+          <button
+            onClick={() => setTaskViewMode('kanban')}
+            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+              taskViewMode === 'kanban'
+                ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            看板
           </button>
         </div>
       </div>
