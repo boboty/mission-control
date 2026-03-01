@@ -72,7 +72,7 @@ export function CardHeader({
           </div>
         )}
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">{title}</h2>
+          <h2 className="text-lg font-semibold dark:text-white">{title}</h2>
           {subtitle && <p className="text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] text-sm mt-0.5">{subtitle}</p>}
         </div>
       </div>

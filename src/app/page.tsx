@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon';
 import { TaskBoard, TaskItem, SortableTaskItem, Pagination } from '../components/dashboard/TaskBoard';
 import { Pipeline, PipelineItem } from '../components/dashboard/Pipeline';
 import { TeamOverview } from '../components/dashboard/TeamOverview';
+import { KANBAN_COLUMNS } from '../lib/types';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -493,6 +494,7 @@ export default function Dashboard() {
   const [memoryTopicsLoading, setMemoryTopicsLoading] = useState(false);
   const [decisionSummary, setDecisionSummary] = useState<DecisionSummary>({ total: 0, highPriority: 0, overdue: 0, blocked: 0 });
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -528,7 +530,7 @@ export default function Dashboard() {
     const taskId = Number(active.id);
     // 判断拖拽到哪一列
     let newStatus = '';
-    for (const col of kanbanColumns) {
+    for (const col of KANBAN_COLUMNS) {
       const colTasks = groupTasksByStatus(tasks)[col.id] || [];
       if (colTasks.some((t: Task) => t.id === Number(over.id))) {
         newStatus = col.id;
@@ -538,7 +540,7 @@ export default function Dashboard() {
     
     if (!newStatus) {
       // 可能拖到了列标题，检查 over.id 是否是列 id
-      if (kanbanColumns.some(col => col.id === String(over.id))) {
+      if (KANBAN_COLUMNS.some(col => col.id === String(over.id))) {
         newStatus = String(over.id);
       }
     }
@@ -709,6 +711,9 @@ export default function Dashboard() {
   const metrics = metricsState.metrics;
   const trends = metricsState.trends;
 
+  // 过滤掉已关闭的告警
+  const filteredAlerts = alerts.filter(a => !dismissedAlerts.includes(a.id));
+
   // 打开详情浮窗
   const openDetail = (data: DetailData) => {
     setSelectedItem(data);
@@ -753,7 +758,7 @@ export default function Dashboard() {
               sensors={taskSensors}
             >
               <div className="grid grid-cols-5 gap-3 overflow-x-auto">
-                {kanbanColumns.map(col => (
+                {KANBAN_COLUMNS.map(col => (
                   <div key={col.id} className="min-w-[200px]">
                     <div className={`${col.color} text-white text-xs font-medium px-3 py-2 rounded-t-lg flex items-center justify-between`}>
                       <span>{col.title}</span>
@@ -1001,11 +1006,32 @@ export default function Dashboard() {
                 <div className="p-5">
                   {activeModule === 'tasks' ? (
                     <>
+                      {/* 视图切换按钮 */}
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">任务看板</h2>
+                        <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg">
+                          {(['list', 'grouped', 'kanban'] as const).map((mode) => (
+                            <button
+                              key={mode}
+                              onClick={() => setTaskViewMode(mode)}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                taskViewMode === mode
+                                  ? 'bg-[var(--color-primary)] text-white'
+                                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                              }`}
+                            >
+                              {mode === 'list' ? '列表' : mode === 'grouped' ? '分组' : '看板'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <TaskBoard 
                         tasks={tasks} 
                         setTasks={setTasks} 
                         loading={taskLoading} 
                         openDetail={openDetail}
+                        taskViewMode={taskViewMode}
+                        setTaskViewMode={setTaskViewMode}
                       />
                     </>
                   ) : (
@@ -1073,17 +1099,14 @@ export default function Dashboard() {
                 )}
               </MetricGroup>
 
-              {/* 健康状态卡片 */}
-              {!loading && (
-                <div className="mb-6">
-                  <HealthOverviewCard health={health} lastUpdated={lastUpdated} alerts={alerts} />
-                </div>
-              )}
-
               {/* 告警卡片区域 */}
-              {!loading && alerts.length > 0 && (
-                <div className="mb-6">
-                  <AlertCard alerts={alerts} compact={false} />
+              {!loading && filteredAlerts.length > 0 && (
+                <div className="mb-4">
+                  <AlertCard 
+                    alerts={filteredAlerts} 
+                    compact={true} 
+                    onDismiss={(id) => setDismissedAlerts(prev => [...prev, id])} 
+                  />
                 </div>
               )}
 
@@ -1146,7 +1169,7 @@ export default function Dashboard() {
                                   <Icon name={module.icon} size={24} color="white" />
                                 </div>
                                 <div>
-                                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{module.name}</h2>
+                                  <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">{module.name}</h2>
                                   <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">共 {taskPagination?.total || tasks.length} 项任务</p>
                                 </div>
                               </div>

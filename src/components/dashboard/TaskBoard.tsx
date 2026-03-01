@@ -13,6 +13,8 @@ interface TaskBoardProps {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   loading: boolean;
   openDetail: (data: DetailData) => void;
+  taskViewMode?: 'list' | 'grouped' | 'kanban';
+  setTaskViewMode?: (mode: 'list' | 'grouped' | 'kanban') => void;
 }
 
 export function SortableTaskItem({ task, onClick }: { task: Task; onClick: () => void }) {
@@ -64,9 +66,11 @@ export function Pagination({ pagination, onPageChange }: { pagination: Paginatio
   );
 }
 
-export function TaskBoard({ tasks, setTasks, loading, openDetail }: TaskBoardProps) {
+export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: externalViewMode, setTaskViewMode: externalSetViewMode }: TaskBoardProps) {
   const [taskSortBy, setTaskSortBy] = useState<'default' | 'priority' | 'dueDate' | 'status'>('default');
-  const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped' | 'kanban'>('list');
+  const [internalViewMode, setInternalViewMode] = useState<'list' | 'grouped' | 'kanban'>('list');
+  const taskViewMode = externalViewMode ?? internalViewMode;
+  const setTaskViewMode = externalSetViewMode ?? setInternalViewMode;
   const [taskSearch, setTaskSearch] = useState('');
   const [taskStatusFilter, setTaskStatusFilter] = useState('');
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
