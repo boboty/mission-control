@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, PriorityBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert } from '../components';
+import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert } from '../components';
 import { Icon } from '../components/Icon';
+import { TaskBoard, TaskItem, SortableTaskItem, Pagination } from '../components/dashboard/TaskBoard';
+import { Pipeline, PipelineItem } from '../components/dashboard/Pipeline';
+import { TeamOverview } from '../components/dashboard/TeamOverview';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -21,13 +24,6 @@ interface Task {
   updated_at?: string;
 }
 
-interface Pipeline {
-  id: number;
-  item_name: string;
-  stage: string;
-  owner: string;
-  due_at: string;
-}
 
 interface Event {
   id: number;
@@ -142,15 +138,6 @@ const statusGroupNames: Record<string, string> = {
   blocked: '已阻塞',
 };
 
-// 看板列定义
-const kanbanColumns = [
-  { id: 'todo', title: '待办', color: 'bg-slate-500' },
-  { id: 'in_progress', title: '进行中', color: 'bg-blue-500' },
-  { id: 'checklist', title: '检查中', color: 'bg-amber-500' },
-  { id: 'blocked', title: '阻塞', color: 'bg-rose-500' },
-  { id: 'done', title: '已完成', color: 'bg-emerald-500' },
-];
-
 // 状态选项
 const statusOptions = [
   { value: '', label: '全部状态' },
@@ -212,31 +199,6 @@ function taskToDetail(task: Task): DetailData {
     },
     timeline: timeline.length > 0 ? timeline : undefined,
     relatedObjects: relatedObjects.length > 0 ? relatedObjects : undefined,
-  };
-}
-
-function pipelineToDetail(item: Pipeline): DetailData {
-  return {
-    id: item.id,
-    type: 'pipeline',
-    title: item.item_name,
-    status: item.stage,
-    owner: item.owner,
-    dueAt: item.due_at,
-    createdAt: item.due_at ? new Date(new Date(item.due_at).getTime() - 86400000 * 7).toISOString() : undefined,
-    updatedAt: item.due_at,
-    metadata: {
-      createdUser: item.owner || '系统',
-      tags: ['流程'],
-    },
-    timeline: [
-      {
-        timestamp: item.due_at || new Date().toISOString(),
-        type: 'created' as const,
-        title: '流程创建',
-        description: `阶段：${item.stage}`,
-      },
-    ],
   };
 }
 
@@ -337,10 +299,10 @@ function healthToDetail(snapshot: Health): DetailData {
 function SystemStatus({ health }: { health: Health[] }) {
   const latest = health[0];
   const isHealthy = latest?.cron_ok && (!latest.blocked_count || latest.blocked_count === 0);
-  
+
   return (
     <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl ${
-      isHealthy ? 'bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]' : 
+      isHealthy ? 'bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]' :
       'bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]'
     }`}>
       <span className="relative flex h-2.5 w-2.5">
@@ -358,158 +320,61 @@ function SystemStatus({ health }: { health: Health[] }) {
   );
 }
 
-// 可拖拽任务项
-function SortableTaskItem({ task, onClick }: { task: Task; onClick?: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
-  const isBlocked = task.blocker || task.status === 'blocked';
-  
-  return (
-    <div 
-      ref={setNodeRef} 
-      style={style}
-      {...attributes} 
-      {...listeners}
-      className={`p-2 mb-2 rounded-lg cursor-grab active:cursor-grabbing bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] border border-[var(--border-light)] dark:border-[var(--border-medium)] hover:border-[var(--color-primary)]/50 transition-colors ${isDragging ? 'opacity-50' : ''}`}
-      onClick={onClick}
-    >
-      <div className="text-xs text-[var(--text-primary)] line-clamp-2">{task.title}</div>
-      {task.priority === 'high' && <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]">高优</span>}
-    </div>
-  );
-}
+function HealthOverviewCard({ health, lastUpdated, alerts }: { health: Health[]; lastUpdated: string | null; alerts: Alert[] }) {
+  const latest = health[0];
+  if (!latest) return null;
 
-// 任务列表项
-function TaskItem({ task, compact = false, onClick }: { task: Task; compact?: boolean; onClick?: () => void }) {
-  const isBlocked = task.blocker || task.status === 'blocked';
-  
-  const content = (
-    <div className={`
-      flex items-start justify-between py-2.5 border-b border-[var(--border-light)] dark:border-[var(--border-medium)] last:border-0 
-      -mx-2 px-2 rounded-lg transition-all duration-200
-      ${isBlocked 
-        ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-1' 
-        : ''
-      }
-    `}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-2">
-          <span className={`text-sm truncate ${
-            isBlocked 
-              ? 'font-semibold text-[var(--badge-error-text)]' 
-              : task.priority === 'high' 
-                ? 'font-semibold text-[var(--text-primary)]' 
-                : 'text-[var(--text-secondary)]'
-          }`}>
-            {task.title}
-          </span>
-          {task.blocker && (
-            <span className="flex-shrink-0 text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium shadow-sm">
-              🚫 阻塞
-            </span>
-          )}
-          {task.priority === 'high' && !task.blocker && (
-            <span className="flex-shrink-0 text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-2 py-0.5 rounded-full font-medium">
-              高优
-            </span>
-          )}
+  const staleBase = latest.last_sync_at || latest.created_at || lastUpdated;
+  const staleHours = staleBase ? (Date.now() - new Date(staleBase).getTime()) / (1000 * 60 * 60) : 0;
+  const staleLevel = staleHours > 24 ? 'error' : staleHours > 2 ? 'warning' : 'success';
+
+  return (
+    <Card hover={false} padding="none">
+      <div className="p-5">
+        <CardHeader
+          icon="health"
+          iconColor="from-rose-500 to-rose-600"
+          title="健康状态"
+          subtitle={`最近检测：${formatUpdateTime(latest.created_at)}`}
+        />
+
+        <div className="border-t border-slate-100 dark:border-slate-700 pt-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3">
+              <div className="text-xs text-[var(--text-muted)]">阻塞任务</div>
+              <div className={`mt-1 text-xl font-semibold ${latest.blocked_count > 0 ? 'text-[var(--badge-error-text)]' : 'text-[var(--text-primary)]'}`}>
+                {latest.blocked_count}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3">
+              <div className="text-xs text-[var(--text-muted)]">待决策</div>
+              <div className={`mt-1 text-xl font-semibold ${latest.pending_decisions > 0 ? 'text-[var(--badge-warning-text)]' : 'text-[var(--text-primary)]'}`}>
+                {latest.pending_decisions}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3">
+              <div className="text-xs text-[var(--text-muted)]">Cron 心跳</div>
+              <div className="mt-1">
+                <StatusBadge status={latest.cron_ok ? 'success' : 'error'} size="sm" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] p-3 bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-[var(--text-secondary)]">告警聚合</span>
+              <span className="text-[var(--text-muted)]">{alerts.length} 条</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <StatusBadge status={latest.blocked_count > 0 ? 'error' : 'success'} size="sm" label={latest.blocked_count > 0 ? '阻塞>2h/阻塞中' : '阻塞正常'} />
+              <StatusBadge status={staleLevel === 'error' ? 'error' : staleLevel === 'warning' ? 'warning' : 'success'} size="sm" label={staleLevel === 'error' ? '数据落后>24h' : staleLevel === 'warning' ? '数据落后>2h' : '数据新鲜'} />
+              <StatusBadge status={latest.cron_ok ? 'success' : 'error'} size="sm" label={latest.cron_ok ? '心跳正常' : '失败心跳'} />
+            </div>
+          </div>
         </div>
-        {!compact && task.next_action && (
-          <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>
-        )}
-        {!compact && task.due_at && (
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            📅 截止：{formatDate(task.due_at)}
-          </p>
-        )}
       </div>
-      <StatusBadge status={task.status} size="sm" />
-    </div>
+    </Card>
   );
-  
-  if (onClick) {
-    return (
-      <ClickableItem onClick={onClick} isBlocked={isBlocked} className="-mx-2 px-2 rounded-lg">
-        {content}
-      </ClickableItem>
-    );
-  }
-  return content;
-}
-
-// 状态分组任务列表
-function TaskGroup({ title, tasks, compact = false, onTaskClick }: { title: string; tasks: Task[]; compact?: boolean; onTaskClick?: (task: Task) => void }) {
-  if (tasks.length === 0) return null;
-  
-  return (
-    <div className="mb-4 last:mb-0">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
-          {title} · {tasks.length}
-        </h4>
-      </div>
-      <div>
-        {tasks.map(task => (
-          <TaskItem 
-            key={task.id} 
-            task={task} 
-            compact={compact} 
-            onClick={onTaskClick ? () => onTaskClick(task) : undefined}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// 分页控制组件
-function Pagination({ pagination, onPageChange }: { pagination: PaginationInfo; onPageChange: (page: number) => void }) {
-  const { page, totalPages, hasMore } = pagination;
-  
-  if (totalPages <= 1) return null;
-  
-  return (
-    <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-light)] dark:border-[var(--border-medium)]">
-      <span className="text-xs text-[var(--text-muted)]">
-        第 {page} / {totalPages} 页
-      </span>
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          className="px-3 py-1.5 text-xs rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-secondary)] transition-colors"
-        >
-          上一页
-        </button>
-        <button
-          onClick={() => onPageChange(page + 1)}
-          disabled={!hasMore}
-          className="px-3 py-1.5 text-xs rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-secondary)] transition-colors"
-        >
-          下一页
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// 管线项
-function PipelineItem({ item, onClick }: { item: Pipeline; onClick?: () => void }) {
-  const content = (
-    <div className="flex items-center justify-between py-2.5 border-b border-[var(--border-light)] dark:border-[var(--border-medium)] last:border-0 -mx-2 px-2 rounded-lg">
-      <span className="text-sm text-[var(--text-secondary)] truncate flex-1">{item.item_name}</span>
-      <StatusBadge status={item.stage} size="sm" />
-    </div>
-  );
-  
-  if (onClick) {
-    return (
-      <ClickableItem onClick={onClick} className="-mx-2 px-2 rounded-lg">
-        {content}
-      </ClickableItem>
-    );
-  }
-  return content;
 }
 
 // 日程项
@@ -862,7 +727,7 @@ export default function Dashboard() {
         if (taskViewMode === 'grouped') {
           const groupedTasks = groupTasksByStatus(tasks);
           return (
-            <div className={`${isSingleModule ? 'max-h-none' : 'max-h-64'} overflow-y-auto -mx-2`}>
+            <div className={`${isSingleModule ? 'max-h-none' : 'max-h-48'} overflow-y-auto -mx-2`}>
               {Object.entries(groupedTasks).map(([status, statusTasks]) => (
                 <TaskGroup 
                   key={status} 
@@ -926,7 +791,7 @@ export default function Dashboard() {
         
         // 列表视图
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? 'max-h-none' : 'max-h-48'} overflow-y-auto -mx-2`}>
             {taskLoading ? (
               <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>
             ) : (
@@ -1052,95 +917,7 @@ export default function Dashboard() {
     }
   };
 
-  // 渲染任务看板控制栏
-  const renderTaskControls = () => (
-    <div className="space-y-3 mb-4">
-      {/* 搜索和筛选行 */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* 搜索框 */}
-        <div className="flex-1">
-          <div className="relative">
-            <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-            <input
-              type="text"
-              placeholder="搜索任务（标题或 ID）..."
-              value={taskSearch}
-              onChange={(e) => setTaskSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
-            />
-          </div>
-        </div>
-        
-        {/* 状态筛选 */}
-        <div className="sm:w-40">
-          <select
-            value={taskStatusFilter}
-            onChange={(e) => setTaskStatusFilter(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
-          >
-            {statusOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* 排序 */}
-        <div className="sm:w-36">
-          <select
-            value={taskSortBy}
-            onChange={(e) => setTaskSortBy(e.target.value as any)}
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-light)] dark:border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
-          >
-            <option value="default">默认排序</option>
-            <option value="priority">优先级</option>
-            <option value="dueDate">截止日期</option>
-            <option value="status">状态</option>
-          </select>
-        </div>
-      </div>
-      
-      {/* 视图切换 */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--text-muted)]">
-          {taskPagination ? `共 ${taskPagination.total} 项任务` : ''}
-        </span>
-        <div className="flex items-center space-x-1 bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-lg p-0.5">
-          <button
-            onClick={() => setTaskViewMode('list')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-              taskViewMode === 'list'
-                ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            列表
-          </button>
-          <button
-            onClick={() => setTaskViewMode('grouped')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-              taskViewMode === 'grouped'
-                ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            分组
-          </button>
-          <button
-            onClick={() => setTaskViewMode('kanban')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-              taskViewMode === 'kanban'
-                ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            看板
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
+    return (
     <div className="min-h-screen bg-gradient-to-br from-[var(--bg-primary)] via-[var(--bg-primary)] to-[var(--bg-secondary)] dark:from-[var(--bg-primary)] dark:via-[var(--bg-secondary)] dark:to-[var(--bg-primary)]">
       {/* 左侧导航 */}
       <LeftNav 
@@ -1224,10 +1001,12 @@ export default function Dashboard() {
                 <div className="p-5">
                   {activeModule === 'tasks' ? (
                     <>
-                      {renderTaskControls()}
-                      <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                        {renderModuleContent(activeModule, true)}
-                      </div>
+                      <TaskBoard 
+                        tasks={tasks} 
+                        setTasks={setTasks} 
+                        loading={taskLoading} 
+                        openDetail={openDetail}
+                      />
                     </>
                   ) : (
                     <>
@@ -1293,6 +1072,13 @@ export default function Dashboard() {
                   </>
                 )}
               </MetricGroup>
+
+              {/* 健康状态卡片 */}
+              {!loading && (
+                <div className="mb-6">
+                  <HealthOverviewCard health={health} lastUpdated={lastUpdated} alerts={alerts} />
+                </div>
+              )}
 
               {/* 告警卡片区域 */}
               {!loading && alerts.length > 0 && (

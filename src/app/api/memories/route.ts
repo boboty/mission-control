@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
+import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -17,7 +18,21 @@ export async function GET() {
       ORDER BY happened_at DESC NULLS LAST
       LIMIT 20
     `);
-    return NextResponse.json({ memories: result.rows, count: result.rows.length });
+
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: result.rows[0]?.happened_at || null,
+      dataUpdatedAt: result.rows[0]?.happened_at || null,
+    });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'memories',
+        rows: result.rows,
+        data: result.rows,
+        meta,
+      })
+    );
   } catch (error) {
     console.error('Failed to fetch memories:', error);
     return NextResponse.json({ error: 'Failed to fetch memories' }, { status: 500 });

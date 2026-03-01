@@ -157,14 +157,35 @@ export function aggregateAlerts(
   const alerts: Alert[] = [];
   const latestHealth = health[0];
 
-  // 阻塞告警
+  // 阻塞告警（>2h 升级）
   if (latestHealth?.blocked_count > 0) {
+    const now = Date.now();
+    const blockedTasks = Array.isArray(tasks)
+      ? tasks.filter((task) => task?.status === 'blocked' || task?.blocker === true)
+      : [];
+
+    const blockedHours = blockedTasks
+      .map((task) => {
+        const timeStr = task?.updated_at || task?.due_at;
+        if (!timeStr) return 0;
+        const t = new Date(timeStr).getTime();
+        if (Number.isNaN(t)) return 0;
+        return (now - t) / (1000 * 60 * 60);
+      })
+      .filter((h) => h > 0);
+
+    const maxBlockedHours = blockedHours.length > 0 ? Math.max(...blockedHours) : 0;
+    const longBlockedCount = blockedHours.filter((h) => h >= 2).length;
+
     alerts.push({
       id: 'blocked-tasks',
       type: 'blocked',
-      level: 'error',
-      title: '有任务被阻塞',
-      message: `当前有 ${latestHealth.blocked_count} 个任务处于阻塞状态，需要立即关注`,
+      level: maxBlockedHours >= 2 ? 'error' : 'warning',
+      title: maxBlockedHours >= 2 ? '阻塞超时告警' : '有任务被阻塞',
+      message:
+        maxBlockedHours >= 2
+          ? `当前有 ${longBlockedCount || latestHealth.blocked_count} 个任务阻塞超过 2 小时，最长约 ${Math.floor(maxBlockedHours)} 小时`
+          : `当前有 ${latestHealth.blocked_count} 个任务处于阻塞状态，需要关注`,
       count: latestHealth.blocked_count,
       timestamp: latestHealth.created_at,
       action: {

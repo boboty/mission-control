@@ -64,7 +64,7 @@ export function CardHeader({
                 <span className="text-lg">{icon}</span>
               ) : (
                 // 图标名称，使用 Icon 组件
-                <Icon name={icon} size={iconSize} color="white" useEmoji={false} />
+                <Icon name={icon} size={iconSize} color="white" />
               )
             ) : (
               icon

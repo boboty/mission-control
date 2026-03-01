@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
+import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -17,12 +18,21 @@ export async function GET() {
       ORDER BY due_at ASC NULLS LAST
       LIMIT 20
     `);
-    return NextResponse.json({
-      pipelines: result.rows,
-      count: result.rows.length,
-      data_source: 'supabase',
-      last_sync_at: result.rows[0]?.updated_at || null,
+
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: result.rows[0]?.updated_at || null,
+      dataUpdatedAt: result.rows[0]?.updated_at || null,
     });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'pipelines',
+        rows: result.rows,
+        data: result.rows,
+        meta,
+      })
+    );
   } catch (error) {
     console.error('Failed to fetch pipelines:', error);
     return NextResponse.json({ error: 'Failed to fetch pipelines' }, { status: 500 });

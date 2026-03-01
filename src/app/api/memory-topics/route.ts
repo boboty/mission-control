@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
 import { promises as fs } from 'fs';
+import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 const TOPICS_DIR = '/home/pve/.openclaw/workspace/memory/topics';
 
@@ -73,11 +74,22 @@ export async function GET() {
       })
     );
 
-    return NextResponse.json({
-      topics: topics.filter(Boolean),
-      index: index || null,
-      count: topics.filter(Boolean).length,
+    const rows = topics.filter(Boolean);
+    const meta = buildMeta({
+      source: 'local',
+      lastSyncAt: new Date().toISOString(),
+      dataUpdatedAt: null,
     });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'topics',
+        rows,
+        data: { topics: rows, index: index || null },
+        meta,
+        extra: { index: index || null },
+      })
+    );
   } catch (error) {
     console.error('Failed to list memory topics:', error);
     return NextResponse.json({ error: 'Failed to list memory topics' }, { status: 500 });

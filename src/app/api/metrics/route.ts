@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
+import { buildMeta } from '../_lib/response';
 
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -43,7 +44,28 @@ export async function GET() {
       pending: historical ? currentPending - (historical.pending_decisions || 0) : 0,
     };
 
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: now,
+      dataUpdatedAt: current.data_updated_at,
+    });
+
     return NextResponse.json({
+      data: {
+        metrics: {
+          total: parseInt(current.total, 10) || 0,
+          inProgress: parseInt(current.in_progress, 10) || 0,
+          blocked: currentBlocked,
+          pending: currentPending,
+        },
+        trends: {
+          total: trends.total,
+          inProgress: trends.in_progress,
+          blocked: trends.blocked,
+          pending: trends.pending,
+        },
+      },
+      meta,
       metrics: {
         total: parseInt(current.total, 10) || 0,
         inProgress: parseInt(current.in_progress, 10) || 0,
@@ -56,9 +78,9 @@ export async function GET() {
         blocked: trends.blocked,
         pending: trends.pending,
       },
-      data_source: 'supabase',
-      last_sync_at: now,
-      data_updated_at: current.data_updated_at,
+      data_source: meta.source,
+      last_sync_at: meta.last_sync_at,
+      data_updated_at: meta.data_updated_at,
     });
   } catch (error) {
     console.error('Failed to fetch metrics:', error);

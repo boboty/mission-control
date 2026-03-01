@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
+import { buildMeta, buildPagination, withLegacyListShape } from '../_lib/response';
 
 export async function PATCH(request: Request) {
   const databaseUrl = process.env.DATABASE_URL;
@@ -136,26 +137,41 @@ export async function GET(request: Request) {
     const dataParams = [...queryParams, safePageSize, offset];
     const result = await client.query(dataQuery, dataParams);
 
-    return NextResponse.json({
-      tasks: result.rows,
-      pagination: {
-        page: safePage,
-        pageSize: safePageSize,
-        total,
-        totalPages: Math.ceil(total / safePageSize),
-        hasMore: offset + result.rows.length < total,
-      },
-      filters: {
-        status,
-        search,
-        sortBy,
-      },
-      data_source: 'supabase',
-      // last_sync_at: when this API successfully fetched from Supabase
-      last_sync_at: now,
-      // data_updated_at: last time underlying tasks data changed
-      data_updated_at: countResult.rows[0].data_updated_at,
+    const pagination = buildPagination({
+      page: safePage,
+      pageSize: safePageSize,
+      total,
     });
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: now,
+      dataUpdatedAt: countResult.rows[0].data_updated_at,
+    });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'tasks',
+        rows: result.rows,
+        data: {
+          tasks: result.rows,
+          pagination,
+          filters: {
+            status,
+            search,
+            sortBy,
+          },
+        },
+        meta,
+        pagination,
+        extra: {
+          filters: {
+            status,
+            search,
+            sortBy,
+          },
+        },
+      })
+    );
   } catch (error) {
     console.error('Failed to fetch tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });

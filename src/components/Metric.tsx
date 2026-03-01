@@ -92,7 +92,7 @@ export function Metric({
           </div>
         </div>
         {icon && (
-          <div className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center`}>
+          <div className={`w-12 h-12 ${colors.icon} rounded-xl flex items-center justify-center`}>
             {typeof icon === 'string' && icon.length <= 2 ? (
               // emoji
               <span className="text-xl">{icon}</span>
@@ -101,7 +101,7 @@ export function Metric({
               <Icon 
                 name={typeof icon === 'string' ? icon : 'metrics'} 
                 size={24} 
-                color={colors.text.replace('text-', 'var(--color-')}
+                color="white"
               />
             )}
           </div>

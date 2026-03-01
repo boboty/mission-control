@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
+import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -18,12 +19,21 @@ export async function GET() {
       ORDER BY starts_at ASC
       LIMIT 20
     `);
-    return NextResponse.json({
-      events: result.rows,
-      count: result.rows.length,
-      data_source: 'supabase',
-      last_sync_at: result.rows[0]?.starts_at || null,
+
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: result.rows[0]?.starts_at || null,
+      dataUpdatedAt: result.rows[0]?.starts_at || null,
     });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'events',
+        rows: result.rows,
+        data: result.rows,
+        meta,
+      })
+    );
   } catch (error) {
     console.error('Failed to fetch events:', error);
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });

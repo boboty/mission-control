@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from 'pg';
+import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET(request: Request) {
   const databaseUrl = process.env.DATABASE_URL;
@@ -76,14 +77,21 @@ export async function GET(request: Request) {
       missingNextAction: parseInt(summaryResult.rows[0].missing_next_action) || 0,
     };
 
-    return NextResponse.json({
-      decisions,
-      summary,
-      count: decisions.length,
-      data_source: 'supabase',
-      last_sync_at: now,
-      data_updated_at: summaryResult.rows[0].data_updated_at,
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: now,
+      dataUpdatedAt: summaryResult.rows[0].data_updated_at,
     });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'decisions',
+        rows: decisions,
+        data: { decisions, summary },
+        meta,
+        extra: { summary },
+      })
+    );
   } catch (error) {
     console.error('Failed to fetch decisions:', error);
     return NextResponse.json({ error: 'Failed to fetch decisions' }, { status: 500 });
