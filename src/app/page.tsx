@@ -727,7 +727,7 @@ export default function Dashboard() {
         if (taskViewMode === 'grouped') {
           const groupedTasks = groupTasksByStatus(tasks);
           return (
-            <div className={`${isSingleModule ? 'max-h-none' : 'max-h-48'} overflow-y-auto -mx-2`}>
+            <div className={`${isSingleModule ? 'max-h-none' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
               {Object.entries(groupedTasks).map(([status, statusTasks]) => (
                 <TaskGroup 
                   key={status} 
@@ -791,7 +791,7 @@ export default function Dashboard() {
         
         // 列表视图
         return (
-          <div className={`${isSingleModule ? 'max-h-none' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? 'max-h-none' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
             {taskLoading ? (
               <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>
             ) : (
@@ -814,7 +814,7 @@ export default function Dashboard() {
           return <EmptyState moduleType="pipelines" icon="empty-pipeline" title="暂无流程" description="当前没有进行中的流程项目" action={<button className="btn btn-primary">新建流程</button>} />;
         }
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
             {pipelines.map(item => (
               <PipelineItem 
                 key={item.id} 
@@ -829,7 +829,7 @@ export default function Dashboard() {
           return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" action={<button className="btn btn-primary">新建日程</button>} />;
         }
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
             {events.map(event => (
               <EventItem 
                 key={event.id} 
@@ -844,7 +844,7 @@ export default function Dashboard() {
           return <EmptyState moduleType="agents" icon="empty-team" title="暂无智能体" description="还没有注册的智能体" />;
         }
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
             {agents.map(agent => (
               <AgentItem 
                 key={agent.id} 
@@ -862,7 +862,7 @@ export default function Dashboard() {
           return <EmptyState moduleType="memories" icon="empty-archive" title="暂无主题" description="memory/topics 下还没有主题文件" />;
         }
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
             {memoryTopics.map((t) => (
               <ClickableItem
                 key={t.slug}
@@ -902,7 +902,7 @@ export default function Dashboard() {
           return <EmptyState moduleType="health" icon="empty-heart" title="暂无数据" description="健康检测数据尚未生成" />;
         }
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-48'} overflow-y-auto -mx-2`}>
+          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
             {health.map(snapshot => (
               <HealthItem 
                 key={snapshot.id} 
