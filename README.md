@@ -2,6 +2,17 @@
 
 AI 驱动的任务管理与自动化巡检系统。
 
+## 预览
+
+### 仪表盘
+![Dashboard](docs/screenshot-dashboard.jpg)
+
+### 任务看板
+![TaskBoard](docs/screenshot-taskboard.jpg)
+
+### 看板视图
+![Kanban](docs/screenshot-kanban.jpg)
+
 ## 功能
 
 - **任务看板**：可视化任务管理，支持列表/分组/看板视图，拖拽更新状态
