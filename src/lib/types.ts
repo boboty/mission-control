@@ -36,6 +36,7 @@ export interface Agent {
   id: number;
   agent_key: string;
   display_name: string;
+  description?: string;
   state: string;
   last_seen_at: string;
 }

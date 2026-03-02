@@ -13,7 +13,7 @@ export async function GET() {
   try {
     await client.connect();
     const result = await client.query(`
-      SELECT id, agent_key, display_name, state, last_seen_at
+      SELECT id, agent_key, display_name, description, state, last_seen_at
       FROM agents
       ORDER BY state DESC, last_seen_at DESC NULLS LAST
       LIMIT 20

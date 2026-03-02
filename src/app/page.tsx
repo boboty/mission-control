@@ -696,6 +696,22 @@ export default function Dashboard() {
     }
   }, [taskStatusFilter, taskSearch, taskSortBy]);
 
+  // Agent 状态轮询（每 10 秒刷新一次）
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await fetch('/api/agents');
+        const data = await res.json();
+        if (data.agents) setAgents(data.agents);
+      } catch (e) {
+        // ignore
+      }
+    };
+    
+    const interval = setInterval(fetchAgents, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   // 处理分页变化
   const handleTaskPageChange = (newPage: number) => {
     fetchTasks(newPage);
@@ -845,20 +861,7 @@ export default function Dashboard() {
           </div>
         );
       case 'agents':
-        if (agents.length === 0) {
-          return <EmptyState moduleType="agents" icon="empty-team" title="暂无智能体" description="还没有注册的智能体" />;
-        }
-        return (
-          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
-            {agents.map(agent => (
-              <AgentItem 
-                key={agent.id} 
-                agent={agent} 
-                onClick={() => openDetail(agentToDetail(agent))}
-              />
-            ))}
-          </div>
-        );
+        return <TeamOverview agents={agents} openDetail={openDetail} />;
       case 'memory_topics':
         if (memoryTopicsLoading) {
           return <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>;
