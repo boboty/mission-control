@@ -50,23 +50,23 @@ function AgentFigure({ position, online, agentName, onClick, rotation = [0, 0, 0
             <meshStandardMaterial color={headColor} roughness={0.3} metalness={0.2} />
           </mesh>
           
-          {/* 眼睛 */}
+          {/* 眼睛 - 在 +Z 方向（旋转后面向显示器） */}
           {online && (
             <>
-              <mesh position={[-0.06, 0.58, 0.16]}>
+              <mesh position={[-0.07, 0.58, 0.17]}>
                 <sphereGeometry args={[0.035, 8, 8]} />
                 <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.8} />
               </mesh>
-              <mesh position={[0.06, 0.58, 0.16]}>
+              <mesh position={[0.07, 0.58, 0.17]}>
                 <sphereGeometry args={[0.035, 8, 8]} />
                 <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.8} />
               </mesh>
               {/* 瞳孔 */}
-              <mesh position={[-0.06, 0.58, 0.19]}>
+              <mesh position={[-0.07, 0.58, 0.2]}>
                 <sphereGeometry args={[0.015, 8, 8]} />
                 <meshStandardMaterial color="#1f2937" />
               </mesh>
-              <mesh position={[0.06, 0.58, 0.19]}>
+              <mesh position={[0.07, 0.58, 0.2]}>
                 <sphereGeometry args={[0.015, 8, 8]} />
                 <meshStandardMaterial color="#1f2937" />
               </mesh>
@@ -233,8 +233,8 @@ function Desk({ position, online, agentName, onClick }: {
         ))}
       </group>
       
-      {/* 椅子 - 浅色 */}
-      <group position={[0, 0, 0.55]}>
+      {/* 椅子 - 浅色 - 放在桌子 +Z 侧边缘 (z+0.55) */}
+      <group position={[0, 0, 0.55]} rotation={[0, Math.PI, 0]}>
         <RoundedBox args={[0.4, 0.08, 0.4]} radius={0.02} position={[0, 0.22, 0]}>
           <meshStandardMaterial color="#94a3b8" roughness={0.7} />
         </RoundedBox>
@@ -410,7 +410,7 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
   const accentColor = stateColors[state] || '#10b981';
   
   return (
-    <group position={position}>
+    <group position={position} rotation={[0, Math.PI, 0]}>
       {/* 地面 - 地毯 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <planeGeometry args={[4, 3.5]} />
@@ -474,8 +474,8 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
         </group>
       </group>
       
-      {/* 老板椅 */}
-      <group position={[0, 0, 0.75]}>
+      {/* 老板椅 - 旋转180° - 放在桌子 +Z 侧 */}
+      <group position={[0, 0, 0.75]} rotation={[0, Math.PI, 0]}>
         <RoundedBox args={[0.55, 0.1, 0.55]} radius={0.03} position={[0, 0.28, 0]}>
           <meshStandardMaterial color="#1e293b" />
         </RoundedBox>
@@ -484,8 +484,8 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
         </RoundedBox>
       </group>
       
-      {/* 沙发 - 接待客人 */}
-      <group position={[1.3, 0, 0.8]}>
+      {/* 沙发 - 接待客人 - 旋转90度，放在老板桌侧面 */}
+      <group position={[-1.5, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
         {/* 底座 */}
         <RoundedBox args={[1.2, 0.25, 0.5]} radius={0.05} position={[0, 0.125, 0]}>
           <meshStandardMaterial color="#475569" roughness={0.8} />
@@ -507,8 +507,8 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
         </RoundedBox>
       </group>
       
-      {/* 茶几 */}
-      <group position={[1.3, 0, -0.3]}>
+      {/* 茶几 - 放在沙发前面 */}
+      <group position={[-1.5, 0, -0.8]}>
         <RoundedBox args={[0.5, 0.04, 0.35]} radius={0.02} position={[0, 0.32, 0]}>
           <meshStandardMaterial color="#78350f" roughness={0.6} />
         </RoundedBox>
@@ -548,14 +548,14 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
       <Decor />
       
       {/* 老板办公室 - 一波 */}
-      <BossOffice position={[0, 0, -4.5]} state="working" />
+      <BossOffice position={[0, 0, -3.7]} state="working" />
       
       {/* 工位和小人 - 排除 boss */}
       {agents.filter(a => a.agent_key !== 'boss').slice(0, 5).map((agent, index) => {
         const col = index % cols;
         const row = Math.floor(index / cols);
         const x = offsetX + col * spacingX;
-        const z = -2 + row * spacingZ;
+        const z = -1 + row * spacingZ;
         const online = isOnline(agent.state);
         
         return (
@@ -567,7 +567,7 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
               onClick={() => onAgentClick?.(agent)}
             />
             <AgentFigure 
-              position={[x, 0.4, z + 0.65]} 
+              position={[x, 0.4, z + 0.55]} 
               rotation={[0, Math.PI, 0]}
               online={online} 
               agentName={agent.display_name || agent.agent_key}
