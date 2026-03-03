@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Client } from 'pg';
+import { createPgClient } from '../../_lib/pg';
 
 export async function POST(request: Request) {
   try {
@@ -9,10 +9,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing agent_key or state' }, { status: 400 });
     }
 
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL || 'postgresql://postgres:P8L7%3AEWcf%3AxtKvz@db.lzhgwgwqldflbozvhuot.supabase.co:5432/postgres'
-    });
-    
+    const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:P8L7%3AEWcf%3AxtKvz@db.lzhgwgwqldflbozvhuot.supabase.co:5432/postgres';
+    const client = createPgClient(databaseUrl);
+
     await client.connect();
     await client.query(
       'UPDATE agents SET state = $1, last_seen_at = NOW() WHERE agent_key = $2',

@@ -1,7 +1,9 @@
 node_modules
 .next
-.env.local
-.convex
 logs
 run
+.git
+.env.local
 .env
+Dockerfile
+*.log
