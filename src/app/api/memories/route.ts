@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Client } from 'pg';
+import { createPgClient } from '../_lib/pg';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const client = new Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+  const client = createPgClient(databaseUrl);
 
   try {
     await client.connect();

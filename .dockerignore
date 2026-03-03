@@ -1,0 +1,9 @@
+node_modules
+.next
+logs
+run
+.git
+.env.local
+.env
+Dockerfile
+*.log

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Client } from 'pg';
+import { createPgClient } from '../_lib/pg';
 import { buildMeta, buildPagination, withLegacyListShape } from '../_lib/response';
 
 export async function PATCH(request: Request) {
@@ -15,7 +15,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'taskId and status are required' }, { status: 400 });
   }
 
-  const client = new Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+  const client = createPgClient(databaseUrl);
 
   try {
     await client.connect();
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
   const safePageSize = Math.min(100, Math.max(1, pageSize));
   const offset = (safePage - 1) * safePageSize;
 
-  const client = new Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+  const client = createPgClient(databaseUrl);
 
   try {
     await client.connect();

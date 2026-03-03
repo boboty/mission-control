@@ -6,6 +6,7 @@ interface StatusBadgeProps {
   status: string;
   size?: 'sm' | 'md' | 'lg';
   variant?: 'solid' | 'soft';
+  label?: string;
 }
 
 // 状态文案中文化映射

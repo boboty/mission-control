@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert } from '../components';
 import { Icon } from '../components/Icon';
 import { TaskBoard, TaskItem, SortableTaskItem, Pagination } from '../components/dashboard/TaskBoard';
-import { Pipeline, PipelineItem } from '../components/dashboard/Pipeline';
+import { Pipeline as PipelineComponent, PipelineItem } from '../components/dashboard/Pipeline';
+import type { Pipeline as PipelineType } from '@/lib/types';
 import { TeamOverview } from '../components/dashboard/TeamOverview';
 import { KANBAN_COLUMNS } from '../lib/types';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
+import { pipelineToDetail } from '@/lib/data-utils';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -25,6 +27,27 @@ interface Task {
   updated_at?: string;
 }
 
+type TaskGroupProps = {
+  title: string;
+  tasks: Task[];
+  compact?: boolean;
+  onTaskClick: (task: Task) => void;
+};
+
+function TaskGroup({ title, tasks, onTaskClick }: TaskGroupProps) {
+  return (
+    <div className="mb-3">
+      <div className="px-2 py-2 text-xs font-semibold text-[var(--text-muted)]">
+        {title} · {tasks.length}
+      </div>
+      <div className="space-y-1">
+        {tasks.map((task) => (
+          <TaskItem key={task.id} task={task} onClick={() => onTaskClick(task)} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface Event {
   id: number;
@@ -484,7 +507,7 @@ const MODULE_CONFIG = [
 // ============ 主页面 ============
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [pipelines, setPipelines] = useState<PipelineType[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   // memories (DB table) UI removed; keep API for potential future use.
@@ -821,7 +844,6 @@ export default function Dashboard() {
                   <TaskItem 
                     key={task.id} 
                     task={task} 
-                    compact={true} 
                     onClick={() => openDetail(taskToDetail(task))}
                   />
                 ))}
