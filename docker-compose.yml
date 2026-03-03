@@ -17,6 +17,8 @@ services:
       - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Mission Control}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
     restart: unless-stopped
+    volumes:
+      - /home/pve/.openclaw/workspace/memory:/home/pve/.openclaw/workspace/memory:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
       interval: 30s
