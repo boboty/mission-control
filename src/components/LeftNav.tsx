@@ -21,7 +21,7 @@ interface LeftNavProps {
 const navItems: NavItem[] = [
   { key: 'dashboard', label: '仪表盘', icon: 'dashboard' },
   { key: 'tasks', label: '任务看板', icon: 'tasks' },
-  { key: 'pipelines', label: '流程管线', icon: 'pipelines' },
+  { key: 'pipelines', label: '业务管线', icon: 'pipelines' },
   { key: 'events', label: '日历', icon: 'events' },
   { key: 'memory_topics', label: '记忆主题', icon: 'memories' },
   { key: 'agents', label: '团队概览', icon: 'agents' },

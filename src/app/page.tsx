@@ -498,7 +498,7 @@ function HealthItem({ snapshot, onClick }: { snapshot: Health; onClick?: () => v
 // 模块卡片配置
 const MODULE_CONFIG = [
   { name: '任务看板', icon: 'tasks', color: 'from-blue-500 to-blue-600', key: 'tasks' },
-  { name: '流程管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
+  { name: '业务管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
   { name: '日历', icon: 'events', color: 'from-emerald-500 to-emerald-600', key: 'events' },
   { name: '记忆主题', icon: 'memories', color: 'from-orange-500 to-orange-600', key: 'memory_topics' },
   { name: '团队概览', icon: 'agents', color: 'from-fuchsia-500 to-fuchsia-600', key: 'agents' },
@@ -1063,7 +1063,7 @@ export default function Dashboard() {
                   ) : activeModule === 'pipelines' ? (
                     <>
                       <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">流程管线</h2>
+                        <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">业务管线</h2>
                       </div>
                       <PipelineList
                         pipelines={pipelines}

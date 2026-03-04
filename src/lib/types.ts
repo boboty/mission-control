@@ -126,7 +126,7 @@ export interface StatusOption {
 // 模块配置常量
 export const MODULE_CONFIG: ModuleConfig[] = [
   { name: '任务看板', icon: 'tasks', color: 'from-blue-500 to-blue-600', key: 'tasks' },
-  { name: '流程管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
+  { name: '业务管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
   { name: '日历', icon: 'events', color: 'from-emerald-500 to-emerald-600', key: 'events' },
   { name: '记忆主题', icon: 'memories', color: 'from-orange-500 to-orange-600', key: 'memory_topics' },
   { name: '团队概览', icon: 'agents', color: 'from-fuchsia-500 to-fuchsia-600', key: 'agents' },
