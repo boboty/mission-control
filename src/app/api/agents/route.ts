@@ -5,45 +5,52 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * 从 OpenClaw runtime 读取子代理状态
- * 解析 ~/.openclaw/run/sessions.json 或类似文件
+ * 从 Agent Status Tracker skill 读取心跳状态
+ * 位置：~/.openclaw/run/agent-{agent_key}.heartbeat
  */
-async function getActiveSubagents(): Promise<Record<string, string>> {
+async function getAgentStatusFromHeartbeat(): Promise<Record<string, string>> {
   try {
-    // 尝试读取 sessions 状态文件
     const homeDir = process.env.HOME || process.env.USERPROFILE || '/root';
-    const sessionsPath = path.join(homeDir, '.openclaw', 'run', 'sessions.json');
+    const heartbeatDir = path.join(homeDir, '.openclaw', 'run');
     
-    if (fs.existsSync(sessionsPath)) {
-      const content = fs.readFileSync(sessionsPath, 'utf8');
-      const sessions = JSON.parse(content);
-      
-      const activeMap: Record<string, string> = {};
-      const now = Date.now();
-      const activeThreshold = 5 * 60 * 1000; // 5 分钟
-      
-      // 查找最近活跃的子代理
-      for (const session of sessions) {
-        if (session.kind === 'subagent' && session.lastActiveAt) {
-          const lastActive = new Date(session.lastActiveAt).getTime();
-          if (now - lastActive < activeThreshold) {
-            // 从 sessionKey 提取 agent_key
-            // 格式：agent:agent_code:subagent:xxx
-            const match = session.sessionKey?.match(/agent:([^:]+):subagent:/);
-            if (match) {
-              const [, agentKey] = match;
-              activeMap[agentKey] = session.status === 'running' ? 'running' : 'active';
-            }
-          }
-        }
-      }
-      
-      return activeMap;
+    if (!fs.existsSync(heartbeatDir)) {
+      return {};
     }
     
-    return {};
+    const files = fs.readdirSync(heartbeatDir);
+    const statusMap: Record<string, string> = {};
+    const now = Date.now();
+    const timeout = 10 * 60 * 1000; // 10 分钟超时
+    
+    for (const file of files) {
+      if (!file.startsWith('agent-') || !file.endsWith('.heartbeat')) {
+        continue;
+      }
+      
+      try {
+        const filePath = path.join(heartbeatDir, file);
+        const content = fs.readFileSync(filePath, 'utf8');
+        const data = JSON.parse(content);
+        
+        const agentKey = data.agent_key;
+        const lastUpdate = data.updated_at || 0;
+        const age = now - lastUpdate;
+        
+        if (age > timeout) {
+          // 超时，视为 idle
+          statusMap[agentKey] = 'idle';
+        } else {
+          // 未超时，使用记录的状态
+          statusMap[agentKey] = data.state || 'idle';
+        }
+      } catch (e) {
+        // 忽略损坏的文件
+      }
+    }
+    
+    return statusMap;
   } catch (e) {
-    console.error('Failed to get active subagents from file:', e);
+    console.error('Failed to get agent status from heartbeat:', e);
     return {};
   }
 }
@@ -54,8 +61,8 @@ export async function GET() {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  // 获取实时子代理状态
-  const activeSubagents = await getActiveSubagents();
+  // 获取心跳状态
+  const heartbeatStatus = await getAgentStatusFromHeartbeat();
 
   const client = createPgClient(databaseUrl);
 
@@ -72,16 +79,18 @@ export async function GET() {
         state DESC, 
         last_seen_at DESC NULLS LAST
       LIMIT 20
-    `, [Object.keys(activeSubagents)]);
+    `, [Object.keys(heartbeatStatus)]);
 
-    // 合并实时状态
+    // 合并心跳状态
     const agentsWithRealtimeState = result.rows.map(row => ({
       ...row,
-      state: activeSubagents[row.agent_key] || row.state,
+      state: heartbeatStatus[row.agent_key] || row.state,
     }));
 
+    const hasRealtimeData = heartbeatStatus && Object.keys(heartbeatStatus).length > 0;
+
     const meta = buildMeta({
-      source: activeSubagents && Object.keys(activeSubagents).length > 0 ? 'supabase+runtime' : 'supabase',
+      source: hasRealtimeData ? 'supabase+heartbeat' : 'supabase',
       lastSyncAt: new Date().toISOString(),
       dataUpdatedAt: new Date().toISOString(),
     });
