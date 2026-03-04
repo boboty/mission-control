@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "任务控制中心 | Mission Control",
   description: "实时数据看板 - Supabase 驱动",
+  icons: {
+    icon: [{ url: "/favicon-32.png", type: "image/png" }],
+    apple: [{ url: "/icon-192.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
