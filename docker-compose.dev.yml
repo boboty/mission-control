@@ -1,0 +1,36 @@
+services:
+  mission-control-dev:
+    image: node:20-bookworm
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+      - .env.local
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_TELEMETRY_DISABLED=1
+      # Reduce file watcher issues inside containers
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./:/app
+      - /home/pve/.openclaw/workspace/memory:/home/pve/.openclaw/workspace/memory:ro
+      - mission_control_node_modules:/app/node_modules
+      - mission_control_next:/app/.next
+    command: >
+      bash -lc '
+        if [ ! -d node_modules ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
+          echo "[dev] node_modules empty -> npm install";
+          npm install;
+        else
+          echo "[dev] node_modules present -> skip npm install";
+        fi
+        npm run dev
+      '
+
+volumes:
+  mission_control_node_modules:
+  mission_control_next:

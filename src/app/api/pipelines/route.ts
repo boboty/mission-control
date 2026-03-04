@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta, buildPagination, withLegacyListShape } from '../_lib/response';
 
 export async function GET(request: Request) {
@@ -19,10 +19,11 @@ export async function GET(request: Request) {
   const safePageSize = Math.min(100, Math.max(1, pageSize));
   const offset = (safePage - 1) * safePageSize;
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
+
 
     const whereClauses: string[] = [];
     const queryParams: any[] = [];
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     const countQuery = `SELECT COUNT(*) as total, MAX(updated_at) as data_updated_at FROM pipelines ${whereClause}`;
-    const countResult = await client.query(countQuery, queryParams);
+    const countResult = await pool.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total, 10);
     const now = new Date().toISOString();
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     const dataParams = [...queryParams, safePageSize, offset];
-    const result = await client.query(dataQuery, dataParams);
+    const result = await pool.query(dataQuery, dataParams);
 
     const pagination = buildPagination({
       page: safePage,
@@ -110,7 +111,8 @@ export async function GET(request: Request) {
     console.error('Failed to fetch pipelines:', error);
     return NextResponse.json({ error: 'Failed to fetch pipelines' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }
 
@@ -127,12 +129,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'item_name is required' }, { status: 400 });
   }
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
 
-    const result = await client.query(
+
+    const result = await pool.query(
       `INSERT INTO pipelines (item_name, stage, owner, due_at, updated_at)
        VALUES ($1, $2, $3, $4, NOW())
        RETURNING id, item_name, stage, owner, due_at, updated_at`,
@@ -147,7 +150,8 @@ export async function POST(request: Request) {
     console.error('Failed to create pipeline:', error);
     return NextResponse.json({ error: 'Failed to create pipeline' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }
 
@@ -186,10 +190,11 @@ export async function PATCH(request: Request) {
 
   setClauses.push(`updated_at = NOW()`);
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
+
 
     const query = `
       UPDATE pipelines
@@ -198,7 +203,7 @@ export async function PATCH(request: Request) {
       RETURNING id, item_name, stage, owner, due_at, updated_at
     `;
 
-    const result = await client.query(query, [...queryParams, id]);
+    const result = await pool.query(query, [...queryParams, id]);
 
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Pipeline not found' }, { status: 404 });
@@ -212,6 +217,7 @@ export async function PATCH(request: Request) {
     console.error('Failed to update pipeline:', error);
     return NextResponse.json({ error: 'Failed to update pipeline' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }

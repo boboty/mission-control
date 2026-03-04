@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET() {
@@ -8,12 +8,13 @@ export async function GET() {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
 
-    const snapshotsResult = await client.query(`
+
+    const snapshotsResult = await pool.query(`
       SELECT id, blocked_count, pending_decisions, cron_ok, created_at
       FROM health_snapshots
       ORDER BY created_at DESC
@@ -21,7 +22,7 @@ export async function GET() {
     `);
 
     // 与任务列表口径对齐（未完成 + blocker=true）
-    const taskAggregateResult = await client.query(`
+    const taskAggregateResult = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE status != 'done' AND blocker = true) AS blocked_count,
         COUNT(*) FILTER (
@@ -81,6 +82,7 @@ export async function GET() {
     console.error('Failed to fetch health snapshots:', error);
     return NextResponse.json({ error: 'Failed to fetch health snapshots' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }

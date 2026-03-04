@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
 import fs from 'fs';
 import path from 'path';
@@ -64,11 +64,12 @@ export async function GET() {
   // 获取心跳状态
   const heartbeatStatus = await getAgentStatusFromHeartbeat();
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
-    const result = await client.query(`
+    // pool is lazy; no explicit connect
+
+    const result = await pool.query(`
       SELECT id, agent_key, display_name, description, state, last_seen_at
       FROM agents
       ORDER BY 
@@ -119,6 +120,7 @@ export async function GET() {
     console.error('Failed to fetch agents:', error);
     return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }

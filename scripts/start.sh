@@ -15,5 +15,4 @@ start() {
   echo "[$name] started pid=$(cat "$pidf")"
 }
 
-start convex "npx convex dev"
 start next "npm run dev:next"

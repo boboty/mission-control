@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET() {
@@ -8,11 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
-    const result = await client.query(`
+    // pool is lazy; no explicit connect
+
+    const result = await pool.query(`
       SELECT id, title, category, ref_path, summary, happened_at
       FROM memories
       ORDER BY happened_at DESC NULLS LAST
@@ -37,6 +38,7 @@ export async function GET() {
     console.error('Failed to fetch memories:', error);
     return NextResponse.json({ error: 'Failed to fetch memories' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta } from '../_lib/response';
 
 export async function GET() {
@@ -8,12 +8,13 @@ export async function GET() {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
 
-    const currentMetrics = await client.query(`
+
+    const currentMetrics = await pool.query(`
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
@@ -23,7 +24,7 @@ export async function GET() {
       FROM tasks
     `);
 
-    const historicalMetrics = await client.query(`
+    const historicalMetrics = await pool.query(`
       SELECT blocked_count, pending_decisions
       FROM health_snapshots
       ORDER BY created_at DESC
@@ -86,6 +87,7 @@ export async function GET() {
     console.error('Failed to fetch metrics:', error);
     return NextResponse.json({ error: 'Failed to fetch metrics' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }

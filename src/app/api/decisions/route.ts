@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 export async function GET(request: Request) {
@@ -8,10 +8,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
+
 
     // 决策口径：所有 blocker=true 且未完成任务
     const decisionsQuery = `
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
       LIMIT 50
     `;
 
-    const decisionsResult = await client.query(decisionsQuery);
+    const decisionsResult = await pool.query(decisionsQuery);
 
     // 汇总口径与列表保持一致
     const summaryQuery = `
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
         AND blocker = true
     `;
 
-    const summaryResult = await client.query(summaryQuery);
+    const summaryResult = await pool.query(summaryQuery);
     const now = new Date().toISOString();
 
     const decisions = decisionsResult.rows.map(row => ({
@@ -96,6 +97,7 @@ export async function GET(request: Request) {
     console.error('Failed to fetch decisions:', error);
     return NextResponse.json({ error: 'Failed to fetch decisions' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }

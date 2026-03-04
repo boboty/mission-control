@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../../_lib/pg';
+import { getPgPool } from '../../_lib/pg';
 
 export async function POST(request: Request) {
   try {
@@ -10,14 +10,16 @@ export async function POST(request: Request) {
     }
 
     const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:P8L7%3AEWcf%3AxtKvz@db.lzhgwgwqldflbozvhuot.supabase.co:5432/postgres';
-    const client = createPgClient(databaseUrl);
+    const pool = getPgPool(databaseUrl);
 
-    await client.connect();
-    await client.query(
+    // pool is lazy; no explicit connect
+
+    await pool.query(
       'UPDATE agents SET state = $1, last_seen_at = NOW() WHERE agent_key = $2',
       [state, agent_key]
     );
-    await client.end();
+    // pool: do not end per-request
+
 
     return NextResponse.json({ success: true, agent_key, state });
   } catch (error) {

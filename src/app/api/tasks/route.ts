@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPgClient } from '../_lib/pg';
+import { getPgPool } from '../_lib/pg';
 import { buildMeta, buildPagination, withLegacyListShape } from '../_lib/response';
 
 export async function PATCH(request: Request) {
@@ -15,35 +15,36 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'taskId and status are required' }, { status: 400 });
   }
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
-    await client.query('BEGIN');
+    // pool is lazy; no explicit connect
+
+    await pool.query('BEGIN');
 
     // Get current task status
-    const taskResult = await client.query('SELECT status FROM tasks WHERE id = $1', [taskId]);
+    const taskResult = await pool.query('SELECT status FROM tasks WHERE id = $1', [taskId]);
     if (taskResult.rows.length === 0) {
-      await client.query('ROLLBACK');
+      await pool.query('ROLLBACK');
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
     const fromStatus = taskResult.rows[0].status;
 
     // Update task status
-    await client.query(
+    await pool.query(
       'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2',
       [status, taskId]
     );
 
     // Insert event record
-    await client.query(
+    await pool.query(
       `INSERT INTO task_events (task_id, event_type, from_status, to_status, actor, meta, created_at)
        VALUES ($1, 'status_change', $2, $3, $4, $5, NOW())`,
       [taskId, fromStatus, status, actor, meta ? JSON.stringify(meta) : null]
     );
 
-    await client.query('COMMIT');
+    await pool.query('COMMIT');
 
     return NextResponse.json({
       success: true,
@@ -52,11 +53,12 @@ export async function PATCH(request: Request) {
       toStatus: status,
     });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await pool.query('ROLLBACK');
     console.error('Failed to update task status:', error);
     return NextResponse.json({ error: 'Failed to update task status' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }
 
@@ -77,10 +79,11 @@ export async function GET(request: Request) {
   const safePageSize = Math.min(100, Math.max(1, pageSize));
   const offset = (safePage - 1) * safePageSize;
 
-  const client = createPgClient(databaseUrl);
+  const pool = getPgPool(databaseUrl);
 
   try {
-    await client.connect();
+    // pool is lazy; no explicit connect
+
 
     const whereClauses: string[] = [];
     const queryParams: any[] = [];
@@ -123,7 +126,7 @@ export async function GET(request: Request) {
     }
 
     const countQuery = `SELECT COUNT(*) as total, MAX(updated_at) as data_updated_at FROM tasks ${whereClause}`;
-    const countResult = await client.query(countQuery, queryParams);
+    const countResult = await pool.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total, 10);
     const now = new Date().toISOString();
 
@@ -135,7 +138,7 @@ export async function GET(request: Request) {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     const dataParams = [...queryParams, safePageSize, offset];
-    const result = await client.query(dataQuery, dataParams);
+    const result = await pool.query(dataQuery, dataParams);
 
     const pagination = buildPagination({
       page: safePage,
@@ -176,6 +179,7 @@ export async function GET(request: Request) {
     console.error('Failed to fetch tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   } finally {
-    await client.end();
+    // pool: do not end per-request
+
   }
 }
