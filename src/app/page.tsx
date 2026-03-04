@@ -5,6 +5,7 @@ import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, Status
 import { Icon } from '../components/Icon';
 import { TaskBoard, TaskItem, SortableTaskItem, Pagination } from '../components/dashboard/TaskBoard';
 import { Pipeline as PipelineComponent, PipelineItem } from '../components/dashboard/Pipeline';
+import { PipelineList } from '../components/dashboard/PipelineList';
 import type { Pipeline as PipelineType } from '@/lib/types';
 import { TeamOverview } from '../components/dashboard/TeamOverview';
 import { KANBAN_COLUMNS } from '../lib/types';
@@ -1057,6 +1058,18 @@ export default function Dashboard() {
                         openDetail={openDetail}
                         taskViewMode={taskViewMode}
                         setTaskViewMode={setTaskViewMode}
+                      />
+                    </>
+                  ) : activeModule === 'pipelines' ? (
+                    <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">流程管线</h2>
+                      </div>
+                      <PipelineList
+                        pipelines={pipelines}
+                        setPipelines={setPipelines}
+                        loading={loading}
+                        openDetail={openDetail}
                       />
                     </>
                   ) : (
