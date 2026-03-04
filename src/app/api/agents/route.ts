@@ -81,11 +81,23 @@ export async function GET() {
       LIMIT 20
     `, [Object.keys(heartbeatStatus)]);
 
-    // 合并心跳状态
-    const agentsWithRealtimeState = result.rows.map(row => ({
-      ...row,
-      state: heartbeatStatus[row.agent_key] || row.state,
-    }));
+    // 合并心跳状态（统一为英文状态，前端中文化）
+    const agentsWithRealtimeState = result.rows.map(row => {
+      const realtimeState = heartbeatStatus[row.agent_key];
+      let state = realtimeState || row.state;
+      
+      // 统一状态映射：running/working → running, active → active, 其他 → idle
+      if (realtimeState) {
+        state = realtimeState === 'working' ? 'running' : realtimeState;
+      } else if (row.state === 'working') {
+        state = 'running';
+      }
+      
+      return {
+        ...row,
+        state,
+      };
+    });
 
     const hasRealtimeData = heartbeatStatus && Object.keys(heartbeatStatus).length > 0;
 

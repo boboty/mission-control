@@ -11,6 +11,7 @@ interface StatusBadgeProps {
 
 // 状态文案中文化映射
 const statusTextMap: Record<string, string> = {
+  // 任务状态
   todo: '待办',
   in_progress: '进行中',
   done: '已完成',
@@ -18,8 +19,14 @@ const statusTextMap: Record<string, string> = {
   planning: '规划中',
   recording: '录制中',
   editing: '编辑中',
+  
+  // Agent 状态
   active: '活跃',
   idle: '空闲',
+  running: '运行中',
+  working: '工作中',
+  
+  // 通用状态
   blocked: '阻塞',
   pending: '待决策',
   success: '成功',
@@ -60,6 +67,14 @@ const statusColorMap: Record<string, { solid: string; soft: string }> = {
   active: { 
     solid: 'bg-emerald-500 text-white', 
     soft: 'bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] dark:bg-[var(--badge-success-bg)] dark:text-[var(--badge-success-text)]' 
+  },
+  running: { 
+    solid: 'bg-violet-500 text-white', 
+    soft: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' 
+  },
+  working: { 
+    solid: 'bg-amber-500 text-white', 
+    soft: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' 
   },
   idle: { 
     solid: 'bg-slate-400 text-white', 
