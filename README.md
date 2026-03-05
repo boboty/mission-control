@@ -1,8 +1,8 @@
 # Mission Claw
 
-![Mission Claw Logo](public/logo.png)
+<img src="public/logo.png" alt="Mission Claw Logo" width="120" />
 
-AI 驱动的任务管理与自动化巡检系统。
+> **Mission Claw** 是一款面向 AI Agent 团队的任务管理与自动化巡检系统。通过可视化的任务看板、智能决策中心和定时心跳巡检，帮助 AI 团队高效协作、自动推进阻塞任务。系统支持多视图切换（列表/分组/看板）、拖拽流转、实时数据同步，并与 Supabase 深度集成，实现任务状态的持久化与实时告警。
 
 ## 预览
 
