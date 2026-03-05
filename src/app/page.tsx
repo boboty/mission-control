@@ -1252,7 +1252,7 @@ export default function Dashboard() {
                     M
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Mission Control</h3>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Mission Claw</h3>
                     <p className="text-xs text-[var(--text-muted)]">MVP · 实时任务总览</p>
                   </div>
                 </div>

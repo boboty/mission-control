@@ -77,10 +77,10 @@ export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed 
       <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--border-light)] dark:border-[var(--border-medium)]">
         {!collapsed && (
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-white/60 dark:bg-black/20 border border-[var(--border-light)] dark:border-[var(--border-medium)] shadow-sm flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="Mission Control" className="w-8 h-8 object-cover" />
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/logo.png" alt="Mission Claw" className="w-8 h-8 object-contain" />
             </div>
-            <span className="font-semibold text-[var(--text-primary)] text-sm">Mission Control</span>
+            <span className="font-semibold text-[var(--text-primary)] text-sm">Mission Claw</span>
           </div>
         )}
         <button
