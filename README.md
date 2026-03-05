@@ -1,4 +1,6 @@
-# Mission Control
+# Mission Claw
+
+![Mission Claw Logo](public/logo.png)
 
 AI 驱动的任务管理与自动化巡检系统。
 
