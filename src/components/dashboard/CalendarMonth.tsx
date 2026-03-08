@@ -53,10 +53,17 @@ export function CalendarMonth({
           const isSelected = day.key === selectedDateKey;
 
           return (
-            <button
+            <div
               key={day.key}
-              type="button"
               onClick={() => onSelectDate(day.key)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectDate(day.key);
+                }
+              }}
+              role="button"
+              tabIndex={0}
               className={`rounded-2xl border p-2 text-left transition-all ${
                 compact ? 'min-h-[96px]' : 'min-h-[148px]'
               } ${
@@ -103,11 +110,8 @@ export function CalendarMonth({
                 {extraCount > 0 && (
                   <div className="px-1 text-[11px] text-[var(--text-muted)]">+ {extraCount} 项安排</div>
                 )}
-                {dayEvents.length === 0 && compact && (
-                  <div className="pt-1 text-[10px] text-[var(--text-muted)]">{day.lunarLabel}</div>
-                )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
