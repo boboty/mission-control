@@ -12,14 +12,14 @@
 ### 新增字段
 
 **tasks 表:**
-- `related_pipeline_id INTEGER` - 关联的流程项目 ID
-- `related_event_id INTEGER` - 关联的日历事件 ID
+- `linked_pipeline_id INTEGER` - 关联的流程项目 ID
+- `linked_event_id INTEGER` - 关联的日历事件 ID
 
 **pipelines 表:**
-- `related_task_id INTEGER` - 关联的任务 ID
+- `linked_task_id INTEGER` - 关联的任务 ID
 
 **events 表:**
-- `related_task_id INTEGER` - 关联的任务 ID
+- `linked_task_id INTEGER` - 关联的任务 ID
 
 ### 索引
 为所有新增的外键字段创建了指引以优化查询性能。
@@ -27,9 +27,9 @@
 ## 代码变更
 
 ### 1. 类型定义 (`src/lib/types.ts`)
-- `Task` 接口添加 `related_pipeline_id` 和 `related_event_id` 字段
-- `Pipeline` 接口添加 `related_task_id` 字段
-- `Event` 接口添加 `related_task_id` 字段
+- `Task` 接口添加 `linked_pipeline_id` 和 `linked_event_id` 字段
+- `Pipeline` 接口添加 `linked_task_id` 字段
+- `Event` 接口添加 `linked_task_id` 字段
 
 ### 2. 数据转换 (`src/lib/data-utils.ts`)
 - `taskToDetail()`: 将关联对象添加到 `relatedObjects` 数组
@@ -39,18 +39,18 @@
 ### 3. API 路由更新
 
 **`/api/tasks/route.ts`:**
-- GET: 查询包含 `related_pipeline_id` 和 `related_event_id`
-- PATCH: 支持更新 `relatedPipelineId` 和 `relatedEventId`
+- GET: 查询包含 `linked_pipeline_id` 和 `linked_event_id`
+- PATCH: 支持更新 `linkedPipelineId` 和 `linkedEventId`
 
 **`/api/pipelines/route.ts`:**
-- GET: 查询包含 `related_task_id`
-- POST: 支持创建时设置 `related_task_id`
-- PATCH: 支持更新 `related_task_id`
+- GET: 查询包含 `linked_task_id`
+- POST: 支持创建时设置 `linked_task_id`
+- PATCH: 支持更新 `linked_task_id`
 
 **`/api/events/route.ts`:**
-- GET: 查询包含 `related_task_id`
-- POST: 支持创建时设置 `related_task_id`
-- PATCH: 新增 PATCH 端点，支持更新所有字段包括 `related_task_id`
+- GET: 查询包含 `linked_task_id`
+- POST: 支持创建时设置 `linked_task_id`
+- PATCH: 新增 PATCH 端点，支持更新所有字段包括 `linked_task_id`
 
 ### 4. 组件更新
 
@@ -124,8 +124,8 @@
 
 ### 双向关联
 当前实现支持双向关联：
-- 任务 → 流程/事件（通过 `related_pipeline_id`, `related_event_id`）
-- 流程/事件 → 任务（通过 `related_task_id`）
+- 任务 → 流程/事件（通过 `linked_pipeline_id`, `linked_event_id`）
+- 流程/事件 → 任务（通过 `linked_task_id`）
 
 注意：这是单向外键关系，不是完全的双向同步。如果需要完全同步，需要在应用层维护一致性。
 

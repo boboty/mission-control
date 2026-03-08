@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, starts_at, ends_at, type = 'meeting', source, related_task_id = null } = body;
+    const { title, starts_at, ends_at, type = 'meeting', source, linked_task_id = null } = body;
 
     // Validate required fields
     if (!title || !starts_at) {
@@ -181,9 +181,9 @@ export async function POST(request: NextRequest) {
     const pool = getPgPool(databaseUrl);
 
     const query = `
-      INSERT INTO events (title, starts_at, ends_at, type, source, related_task_id)
+      INSERT INTO events (title, starts_at, ends_at, type, source, linked_task_id)
       VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, title, starts_at, ends_at, type, source, related_task_id
+      RETURNING id, title, starts_at, ends_at, type, source, linked_task_id
     `;
 
     const result = await pool.query(query, [
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       ends_at || null,
       type,
       source || null,
-      related_task_id,
+      linked_task_id,
     ]);
 
     return NextResponse.json({
@@ -221,7 +221,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'id is required' }, { status: 400 });
   }
 
-  const allowedFields = ['title', 'starts_at', 'ends_at', 'type', 'source', 'related_task_id'];
+  const allowedFields = ['title', 'starts_at', 'ends_at', 'type', 'source', 'linked_task_id'];
   const setClauses: string[] = [];
   const queryParams: any[] = [];
   let paramIndex = 1;
@@ -248,7 +248,7 @@ export async function PATCH(request: Request) {
       UPDATE events
       SET ${setClauses.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, title, starts_at, ends_at, type, source, related_task_id
+      RETURNING id, title, starts_at, ends_at, type, source, linked_task_id
     `;
 
     const result = await pool.query(query, [...queryParams, id]);

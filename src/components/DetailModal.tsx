@@ -512,8 +512,8 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObj
           owner: editedData.owner,
           nextAction: editedData.nextAction,
           dueAt: editedData.dueAt,
-          relatedPipelineId: editedData.extra?.related_pipeline_id,
-          relatedEventId: editedData.extra?.related_event_id,
+          linkedPipelineId: editedData.extra?.linked_pipeline_id,
+          linkedEventId: editedData.extra?.linked_event_id,
           actor: 'user',
           meta: { reason: 'inline_edit' },
         }),
@@ -853,20 +853,20 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObj
                       <DetailField label="关联流程" icon="pipelines">
                         <input
                           type="number"
-                          value={editedData.extra?.related_pipeline_id ?? data.extra?.related_pipeline_id ?? ''}
+                          value={editedData.extra?.linked_pipeline_id ?? data.extra?.linked_pipeline_id ?? ''}
                           onChange={(e) => {
                             const val = e.target.value ? Number(e.target.value) : null;
-                            handleFieldChange('extra', { ...editedData.extra, related_pipeline_id: val });
+                            handleFieldChange('extra', { ...editedData.extra, linked_pipeline_id: val });
                           }}
                           placeholder="输入流程 ID"
                           className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 w-full max-w-[200px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                         />
                       </DetailField>
                     ) : (
-                      data.extra?.related_pipeline_id && (
+                      data.extra?.linked_pipeline_id && (
                         <DetailField label="关联流程" icon="pipelines">
-                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.related_pipeline_id, type: 'pipeline', title: `流程 #${data.extra.related_pipeline_id}` })}>
-                            流程 #{data.extra.related_pipeline_id}
+                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.linked_pipeline_id, type: 'pipeline', title: `流程 #${data.extra.linked_pipeline_id}` })}>
+                            流程 #{data.extra.linked_pipeline_id}
                           </span>
                         </DetailField>
                       )
@@ -879,20 +879,20 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObj
                       <DetailField label="关联日程" icon="calendar">
                         <input
                           type="number"
-                          value={editedData.extra?.related_event_id ?? data.extra?.related_event_id ?? ''}
+                          value={editedData.extra?.linked_event_id ?? data.extra?.linked_event_id ?? ''}
                           onChange={(e) => {
                             const val = e.target.value ? Number(e.target.value) : null;
-                            handleFieldChange('extra', { ...editedData.extra, related_event_id: val });
+                            handleFieldChange('extra', { ...editedData.extra, linked_event_id: val });
                           }}
                           placeholder="输入日程 ID"
                           className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 w-full max-w-[200px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                         />
                       </DetailField>
                     ) : (
-                      data.extra?.related_event_id && (
+                      data.extra?.linked_event_id && (
                         <DetailField label="关联日程" icon="calendar">
-                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.related_event_id, type: 'event', title: `日程 #${data.extra.related_event_id}` })}>
-                            日程 #{data.extra.related_event_id}
+                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.linked_event_id, type: 'event', title: `日程 #${data.extra.linked_event_id}` })}>
+                            日程 #{data.extra.linked_event_id}
                           </span>
                         </DetailField>
                       )

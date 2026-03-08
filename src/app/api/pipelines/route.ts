@@ -127,7 +127,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { item_name, stage = 'draft', owner = null, due_at = null, related_task_id = null } = body;
+  const { item_name, stage = 'draft', owner = null, due_at = null, linked_task_id = null } = body;
 
   if (!item_name || typeof item_name !== 'string' || item_name.trim().length === 0) {
     return NextResponse.json({ error: 'item_name is required' }, { status: 400 });
@@ -140,10 +140,10 @@ export async function POST(request: Request) {
 
 
     const result = await pool.query(
-      `INSERT INTO pipelines (item_name, stage, owner, due_at, related_task_id, updated_at)
+      `INSERT INTO pipelines (item_name, stage, owner, due_at, linked_task_id, updated_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
-       RETURNING id, item_name, stage, owner, due_at, related_task_id, updated_at`,
-      [item_name.trim(), stage, owner, due_at, related_task_id]
+       RETURNING id, item_name, stage, owner, due_at, linked_task_id, updated_at`,
+      [item_name.trim(), stage, owner, due_at, linked_task_id]
     );
 
     return NextResponse.json({
@@ -172,7 +172,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'id is required' }, { status: 400 });
   }
 
-  const allowedFields = ['item_name', 'stage', 'owner', 'due_at', 'related_task_id'];
+  const allowedFields = ['item_name', 'stage', 'owner', 'due_at', 'linked_task_id'];
   const setClauses: string[] = [];
   const queryParams: any[] = [];
   let paramIndex = 1;
@@ -204,7 +204,7 @@ export async function PATCH(request: Request) {
       UPDATE pipelines
       SET ${setClauses.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, item_name, stage, owner, due_at, updated_at, related_task_id
+      RETURNING id, item_name, stage, owner, due_at, updated_at, linked_task_id
     `;
 
     const result = await pool.query(query, [...queryParams, id]);

@@ -130,15 +130,13 @@ export function taskToDetail(task: Task): DetailData {
  */
 export function pipelineToDetail(item: Pipeline): DetailData {
   const relatedObjects: any[] = [];
-  // Add linked tasks if available
-  if (item.linked_task_ids && item.linked_task_ids.length > 0) {
-    item.linked_task_ids.forEach((taskId: number) => {
-      relatedObjects.push({
-        id: taskId,
-        type: 'task' as const,
-        title: `任务 #${taskId}`,
-        link: `/tasks/${taskId}`,
-      });
+  // Add linked task if available
+  if (item.linked_task_id) {
+    relatedObjects.push({
+      id: item.linked_task_id,
+      type: 'task' as const,
+      title: `任务 #${item.linked_task_id}`,
+      link: `/tasks/${item.linked_task_id}`,
     });
   }
   
@@ -172,15 +170,13 @@ export function pipelineToDetail(item: Pipeline): DetailData {
  */
 export function eventToDetail(event: Event): DetailData {
   const relatedObjects: any[] = [];
-  // Add linked tasks if available
-  if (event.linked_task_ids && event.linked_task_ids.length > 0) {
-    event.linked_task_ids.forEach((taskId: number) => {
-      relatedObjects.push({
-        id: taskId,
-        type: 'task' as const,
-        title: `任务 #${taskId}`,
-        link: `/tasks/${taskId}`,
-      });
+  // Add linked task if available
+  if (event.linked_task_id) {
+    relatedObjects.push({
+      id: event.linked_task_id,
+      type: 'task' as const,
+      title: `任务 #${event.linked_task_id}`,
+      link: `/tasks/${event.linked_task_id}`,
     });
   }
   

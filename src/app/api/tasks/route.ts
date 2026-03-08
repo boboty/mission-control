@@ -27,7 +27,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { taskId, status, priority, owner, nextAction, dueAt, relatedPipelineId, relatedEventId, actor = 'system', meta, comment } = body;
+  const { taskId, status, priority, owner, nextAction, dueAt, linkedPipelineId, linkedEventId, actor = 'system', meta, comment } = body;
 
   if (!taskId) {
     return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
@@ -79,14 +79,14 @@ export async function PATCH(request: Request) {
       values.push(dueAt);
       paramIndex++;
     }
-    if (relatedPipelineId !== undefined) {
-      updates.push(`related_pipeline_id = $${paramIndex}`);
-      values.push(relatedPipelineId);
+    if (linkedPipelineId !== undefined) {
+      updates.push(`linked_pipeline_id = $${paramIndex}`);
+      values.push(linkedPipelineId);
       paramIndex++;
     }
-    if (relatedEventId !== undefined) {
-      updates.push(`related_event_id = $${paramIndex}`);
-      values.push(relatedEventId);
+    if (linkedEventId !== undefined) {
+      updates.push(`linked_event_id = $${paramIndex}`);
+      values.push(linkedEventId);
       paramIndex++;
     }
 
@@ -199,8 +199,8 @@ export async function PATCH(request: Request) {
         owner,
         nextAction,
         dueAt,
-        relatedPipelineId,
-        relatedEventId,
+        linkedPipelineId,
+        linkedEventId,
       },
     });
   } catch (error) {
@@ -313,8 +313,7 @@ export async function GET(request: Request) {
     const now = new Date().toISOString();
 
     const dataQuery = `
-      SELECT id, title, status, priority, owner, blocker, next_action, due_at, source, updated_at, 
-             related_pipeline_id, related_event_id
+      SELECT id, title, status, priority, owner, blocker, next_action, due_at, source, updated_at
       FROM tasks
       ${whereClause}
       ${orderByClause}

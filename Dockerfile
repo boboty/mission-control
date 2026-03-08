@@ -5,8 +5,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY convex.json ./
-COPY convex ./convex
 
 # Install dependencies (including dev deps for types)
 RUN npm ci --include=dev && npm install --save-dev @types/pg
