@@ -68,15 +68,6 @@ interface Agent {
   last_seen_at: string;
 }
 
-interface Memory {
-  id: number;
-  title: string;
-  category: string;
-  ref_path: string;
-  summary: string;
-  happened_at: string;
-}
-
 interface Health {
   id: number;
   blocked_count: number;
@@ -596,8 +587,7 @@ const MODULE_CONFIG = [
   { name: '任务看板', icon: 'tasks', color: 'from-blue-500 to-blue-600', key: 'tasks' },
   { name: '业务管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
   { name: '日历', icon: 'events', color: 'from-emerald-500 to-emerald-600', key: 'events' },
-  { name: '记忆归档', icon: 'memories', color: 'from-orange-500 to-orange-600', key: 'memory_archive' },
-  { name: '记忆主题', icon: 'folder', color: 'from-amber-500 to-amber-600', key: 'memory_topics' },
+  { name: '记忆主题', icon: 'book', color: 'from-amber-500 to-amber-600', key: 'memory_topics' },
   { name: '团队概览', icon: 'agents', color: 'from-fuchsia-500 to-fuchsia-600', key: 'agents' },
   { name: '运行健康', icon: 'health', color: 'from-rose-500 to-rose-600', key: 'health' },
 ];
@@ -608,7 +598,6 @@ export default function Dashboard() {
   const [pipelines, setPipelines] = useState<PipelineType[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [memories, setMemories] = useState<Memory[]>([]);
   const [health, setHealth] = useState<Health[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [memoryTopics, setMemoryTopics] = useState<MemoryTopic[]>([]);
@@ -739,12 +728,11 @@ export default function Dashboard() {
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       });
 
-      const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoriesRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
+      const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
         fetch(`/api/tasks?page=1&pageSize=20`),
         fetch('/api/pipelines'),
         fetch(`/api/events?${eventsInitParams.toString()}`),
         fetch('/api/agents'),
-        fetch('/api/memories?page=1&pageSize=20'),
         fetch('/api/memory-topics'),
         fetch('/api/health'),
         fetch('/api/metrics'),
@@ -755,7 +743,6 @@ export default function Dashboard() {
       const pipelinesData = await pipelinesRes.json();
       const eventsData = await eventsRes.json();
       const agentsData = await agentsRes.json();
-      const memoriesData = await memoriesRes.json();
       const memoryTopicsData = await memoryTopicsRes.json();
       const healthData = await healthRes.json();
       const metricsData = await metricsRes.json();
@@ -774,9 +761,6 @@ export default function Dashboard() {
         setEventPage(eventsData.pagination?.page || 1);
       }
       if (agentsData.agents) setAgents(agentsData.agents);
-      if (memoriesData?.memories || memoriesData?.data) {
-        setMemories(memoriesData.memories || memoriesData.data || []);
-      }
       if (memoryTopicsData?.topics) {
         setMemoryTopics(memoryTopicsData.topics);
       }
@@ -1113,16 +1097,6 @@ export default function Dashboard() {
         );
       case 'agents':
         return <TeamOverview agents={agents} openDetail={openDetail} />;
-      case 'memory_archive':
-        const MemoryArchiveComponent = require('@/components/dashboard/MemoryArchive').MemoryArchive;
-        return (
-          <MemoryArchiveComponent
-            memories={memories}
-            setMemories={setMemories}
-            loading={loading}
-            openDetail={openDetail}
-          />
-        );
       case 'memory_topics':
         if (memoryTopicsLoading) {
           return <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>;
@@ -1532,7 +1506,6 @@ export default function Dashboard() {
                                 subtitle={
                                   module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
                                   module.key === 'events' ? `共 ${eventPagination?.total ?? events.length} 项日程` :
-                                  module.key === 'memory_archive' ? `共 ${memories.length} 条记忆` :
                                   module.key === 'memory_topics' ? `共 ${memoryTopics.length} 个主题` :
                                   module.key === 'agents' ? `共 ${agents.length} 个智能体` :
                                   `共 ${health.length} 次检测`
