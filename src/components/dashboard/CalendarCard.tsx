@@ -55,7 +55,7 @@ export function CalendarCard({ events, openDetail }: CalendarCardProps) {
         </div>
         <div className="mt-2 space-y-2">
           {selectedDayEvents.length > 0 ? (
-            selectedDayEvents.slice(0, 3).map((event) => (
+            selectedDayEvents.slice(0, 2).map((event) => (
               <ClickableItem key={event.id} onClick={() => openDetail(eventToDetail(event))} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
                 <div className="text-sm font-medium text-[var(--text-primary)] truncate">{event.title}</div>
                 <div className="mt-1 text-xs text-[var(--text-muted)]">{formatEventTimeRange(event)}</div>

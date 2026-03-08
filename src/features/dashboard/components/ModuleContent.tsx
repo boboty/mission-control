@@ -57,10 +57,12 @@ function TaskGroup({
   title,
   tasks,
   onTaskClick,
+  compact = false,
 }: {
   title: string;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
+  compact?: boolean;
 }) {
   return (
     <div className="mb-3">
@@ -69,7 +71,7 @@ function TaskGroup({
       </div>
       <div className="space-y-1">
         {tasks.map((task) => (
-          <TaskItem key={task.id} task={task} onClick={() => onTaskClick(task)} />
+          <TaskItem key={task.id} task={task} onClick={() => onTaskClick(task)} compact={compact} />
         ))}
       </div>
     </div>
@@ -142,6 +144,7 @@ export function ModuleContent({
                 key={status}
                 title={STATUS_GROUP_NAMES[status] || status}
                 tasks={statusTasks}
+                compact={!isSingleModule}
                 onTaskClick={(task) => onOpenDetail(taskToDetail(task))}
               />
             ))}
@@ -199,7 +202,7 @@ export function ModuleContent({
           ) : (
             <>
               {tasks.map((task) => (
-                <TaskItem key={task.id} task={task} onClick={() => onOpenDetail(taskToDetail(task))} />
+                <TaskItem key={task.id} task={task} onClick={() => onOpenDetail(taskToDetail(task))} compact={!isSingleModule} />
               ))}
               {taskPagination && <Pagination pagination={taskPagination} onPageChange={onTaskPageChange} />}
             </>

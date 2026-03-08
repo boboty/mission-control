@@ -140,7 +140,7 @@ export function DashboardOverview({
             module.key === 'health' ? (
               <ModuleContent key={module.key} moduleKey={module.key} isSingleModule={false} {...moduleContentProps} />
             ) : (
-              <Card key={module.key} hover padding="none" className="overflow-hidden">
+              <Card key={module.key} hover padding="none" className="h-full overflow-hidden">
                 <div className="p-6">
                   <CardHeader
                     icon={module.icon}

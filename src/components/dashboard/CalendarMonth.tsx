@@ -48,9 +48,10 @@ export function CalendarMonth({
       <div className="grid grid-cols-7 gap-2">
         {days.map((day) => {
           const dayEvents = eventsByDate[day.key] || [];
-          const visibleEvents = dayEvents.slice(0, compact ? 2 : 3);
+          const visibleEvents = dayEvents.slice(0, compact ? 1 : 3);
           const extraCount = dayEvents.length - visibleEvents.length;
           const isSelected = day.key === selectedDateKey;
+          const secondaryLabel = compact ? day.holidayLabel : day.lunarLabel;
 
           return (
             <div
@@ -65,7 +66,7 @@ export function CalendarMonth({
               role="button"
               tabIndex={0}
               className={`rounded-2xl border p-2 text-left transition-all ${
-                compact ? 'min-h-[96px]' : 'min-h-[148px]'
+                compact ? 'min-h-[76px]' : 'min-h-[148px]'
               } ${
                 isSelected
                   ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] shadow-sm'
@@ -77,18 +78,20 @@ export function CalendarMonth({
                   <div className={`text-sm font-semibold ${day.isToday ? 'text-[var(--color-primary)]' : 'text-[var(--text-primary)]'}`}>
                     {day.dayNumber}
                   </div>
-                  <div className={`mt-0.5 text-[10px] ${day.holidayLabel ? 'text-rose-600 font-medium' : 'text-[var(--text-muted)]'}`}>
-                    {day.lunarLabel}
-                  </div>
+                  {secondaryLabel && (
+                    <div className={`mt-0.5 text-[10px] ${day.holidayLabel ? 'text-rose-600 font-medium' : 'text-[var(--text-muted)]'}`}>
+                      {secondaryLabel}
+                    </div>
+                  )}
                 </div>
                 {day.isToday && (
-                  <span className="rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                  <span className={`rounded-full bg-[var(--color-primary)] font-medium text-white ${compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'}`}>
                     今天
                   </span>
                 )}
               </div>
 
-              <div className="mt-2 space-y-1.5">
+              <div className={`${compact ? 'mt-1.5' : 'mt-2'} space-y-1.5`}>
                 {visibleEvents.map((event) => (
                   <button
                     key={`${day.key}-${event.id}`}
@@ -97,9 +100,9 @@ export function CalendarMonth({
                       clickEvent.stopPropagation();
                       onEventClick?.(event);
                     }}
-                    className={`block w-full rounded-lg border px-2 py-1 text-left ${getEventStyle(event.type)} hover:brightness-[0.98]`}
+                    className={`block w-full rounded-lg border text-left ${getEventStyle(event.type)} hover:brightness-[0.98] ${compact ? 'px-1.5 py-1' : 'px-2 py-1'}`}
                   >
-                    <div className="truncate text-[11px] font-medium">{event.title}</div>
+                    <div className={`truncate font-medium ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{event.title}</div>
                     {!compact && (
                       <div className="mt-0.5 truncate text-[10px] opacity-80">
                         {formatEventTimeRange(event)}
@@ -108,7 +111,7 @@ export function CalendarMonth({
                   </button>
                 ))}
                 {extraCount > 0 && (
-                  <div className="px-1 text-[11px] text-[var(--text-muted)]">+ {extraCount} 项安排</div>
+                  <div className={`px-1 text-[var(--text-muted)] ${compact ? 'text-[10px]' : 'text-[11px]'}`}>+ {extraCount} 项安排</div>
                 )}
               </div>
             </div>

@@ -91,17 +91,19 @@ export function TaskItem({
   task, 
   onClick,
   selected,
-  onToggleSelect
+  onToggleSelect,
+  compact = false,
 }: { 
   task: Task; 
   onClick: () => void;
   selected?: boolean;
   onToggleSelect?: (taskId: number) => void;
+  compact?: boolean;
 }) {
   const isBlocked = task.blocker || task.status === 'blocked';
   return (
     <ClickableItem onClick={onClick} isBlocked={isBlocked} className="-mx-2 px-2 rounded-lg">
-      <div className={`flex items-start justify-between py-3 sm:py-2.5 border-b border-[var(--border-light)] last:border-0 transition-all duration-200 min-h-[48px] touch-target ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-2' : ''} ${selected ? 'bg-[var(--color-primary)]/5' : ''}`}>
+      <div className={`flex items-start justify-between border-b border-[var(--border-light)] last:border-0 transition-all duration-200 min-h-[48px] touch-target ${compact ? 'py-2' : 'py-3 sm:py-2.5'} ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-2' : ''} ${selected ? 'bg-[var(--color-primary)]/5' : ''}`}>
         <div className="flex-1 min-w-0 flex items-start gap-2 sm:gap-3">
           {onToggleSelect && (
             <input
@@ -117,12 +119,12 @@ export function TaskItem({
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 flex-wrap">
-              <span className={`text-sm truncate ${isBlocked || task.priority === 'high' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{task.title}</span>
+              <span className={`truncate ${compact ? 'text-[13px]' : 'text-sm'} ${isBlocked || task.priority === 'high' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{task.title}</span>
               {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium animate-pulse-soft flex-shrink-0">🚫 阻塞</span>}
               {task.priority === 'high' && !task.blocker && <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-2 py-0.5 rounded-full font-medium flex-shrink-0">高优</span>}
             </div>
-            {task.next_action && <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>}
-            {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center flex-wrap"><span className="mr-1 flex-shrink-0">📅</span> <span className="truncate">截止：{formatDate(task.due_at)}</span></p>}
+            {!compact && task.next_action && <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>}
+            {!compact && task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center flex-wrap"><span className="mr-1 flex-shrink-0">📅</span> <span className="truncate">截止：{formatDate(task.due_at)}</span></p>}
           </div>
         </div>
         <StatusBadge status={task.status} size="sm" />
