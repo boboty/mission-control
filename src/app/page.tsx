@@ -12,6 +12,7 @@ import { TeamOverview } from '../components/dashboard/TeamOverview';
 import { KANBAN_COLUMNS } from '../lib/types';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
 import { pipelineToDetail as pipelineToDetailLib, taskToDetail as taskToDetailLib, eventToDetail as eventToDetailLib } from '@/lib/data-utils';
+import { supabase } from '@/lib/supabase';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -82,6 +83,15 @@ interface MemoryTopic {
   title: string;
   ref_path: string;
   summary?: string;
+}
+
+interface Memory {
+  id: number;
+  title: string;
+  category: string;
+  ref_path: string;
+  summary: string;
+  happened_at: string;
 }
 
 interface Decision {
@@ -239,6 +249,17 @@ function getStatusLabel(status: string | null): string {
     done: '已完成',
   };
   return labels[status] || status;
+}
+
+function getPriorityLabel(priority: string | null): string {
+  if (!priority) return '未知';
+  const labels: Record<string, string> = {
+    high: '高',
+    medium: '中',
+    low: '低',
+    none: '无',
+  };
+  return labels[priority] || priority;
 }
 
 async function loadTaskTimeline(taskId: number): Promise<any[]> {
@@ -716,6 +737,19 @@ export default function Dashboard() {
   // 数据验证状态
   const [dataValidation, setDataValidation] = useState<Record<string, { valid: boolean; warnings: string[] }>>({});
 
+  const fetchAgents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/agents');
+      const data = await res.json();
+
+      if (data.agents) {
+        setAgents(data.agents);
+      }
+    } catch (err) {
+      console.error('Failed to fetch agents:', err);
+    }
+  }, []);
+
   // 刷新所有数据
   const refreshAllData = useCallback(async (showLoading = true) => {
     if (showLoading) setIsRefreshing(true);
@@ -814,6 +848,26 @@ export default function Dashboard() {
     
     return () => clearInterval(interval);
   }, [autoRefreshEnabled, autoRefreshInterval, refreshAllData]);
+
+  useEffect(() => {
+    const supabaseClient = supabase;
+    if (!supabaseClient) return;
+
+    const channel = supabaseClient
+      .channel('agents-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agents' },
+        () => {
+          fetchAgents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabaseClient.removeChannel(channel);
+    };
+  }, [fetchAgents]);
 
   // 创建日程
   const createEvent = async (eventData: { title: string; starts_at: string; ends_at?: string; type?: string }) => {
@@ -1571,7 +1625,7 @@ export default function Dashboard() {
                       ? 'text-[var(--color-primary)]'
                       : 'text-[var(--text-muted)]'
                   }`}
-                  aria-label={module.label}
+                  aria-label={module.name}
                   aria-current={activeModule === module.key ? 'page' : undefined}
                 >
                   <Icon 
@@ -1581,7 +1635,7 @@ export default function Dashboard() {
                     className="mb-0.5"
                   />
                   <span className="text-[10px] font-medium truncate w-full text-center">
-                    {module.label.slice(0, 2)}
+                    {module.name.slice(0, 2)}
                   </span>
                 </button>
               ))}

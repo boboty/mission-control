@@ -2,26 +2,33 @@ import { NextResponse } from 'next/server';
 import { getPgPool } from '../../_lib/pg';
 
 export async function POST(request: Request) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+  }
+
   try {
-    const { agent_key, state } = await request.json();
-    
+    const { agent_key, state, display_name, description } = await request.json();
+
     if (!agent_key || !state) {
       return NextResponse.json({ error: 'Missing agent_key or state' }, { status: 400 });
     }
 
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:P8L7%3AEWcf%3AxtKvz@db.lzhgwgwqldflbozvhuot.supabase.co:5432/postgres';
     const pool = getPgPool(databaseUrl);
-
-    // pool is lazy; no explicit connect
+    const normalizedState = state === 'working' ? 'running' : state;
 
     await pool.query(
-      'UPDATE agents SET state = $1, last_seen_at = NOW() WHERE agent_key = $2',
-      [state, agent_key]
+      `INSERT INTO agents (agent_key, display_name, description, state, last_seen_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (agent_key) DO UPDATE SET
+         display_name = COALESCE(EXCLUDED.display_name, agents.display_name),
+         description = COALESCE(EXCLUDED.description, agents.description),
+         state = EXCLUDED.state,
+         last_seen_at = NOW()`,
+      [agent_key, display_name || agent_key, description || null, normalizedState]
     );
-    // pool: do not end per-request
 
-
-    return NextResponse.json({ success: true, agent_key, state });
+    return NextResponse.json({ success: true, agent_key, state: normalizedState });
   } catch (error) {
     console.error('Error updating agent status:', error);
     return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });

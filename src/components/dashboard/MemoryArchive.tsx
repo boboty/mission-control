@@ -152,7 +152,7 @@ export function MemoryArchive({ memories, setMemories, loading, openDetail }: Me
       if (data.memories || data.data) {
         const memoriesData = data.memories || data.data || [];
         setMemories(memoriesData);
-        setPagination(data.extra?.pagination || null);
+        setPagination(data.pagination || null);
       }
     } catch (error) {
       console.error('Failed to fetch memories:', error);

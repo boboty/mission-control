@@ -1,70 +1,47 @@
-/**
- * Agent Status Tracker - Client Helper
- * 在 sessions_spawn 时自动更新 agent 状态
- */
+import { getPgPool } from '@/app/api/_lib/pg';
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs';
-import path from 'path';
+type AgentState = 'running' | 'idle' | 'active';
 
-const execAsync = promisify(exec);
+type AgentStatusOptions = {
+  displayName?: string;
+  description?: string | null;
+};
 
-const HEARTBEAT_DIR = path.join(process.env.HOME || '/root', '.openclaw', 'run');
-
-/**
- * 确保心跳目录存在
- */
-function ensureHeartbeatDir() {
-  if (!fs.existsSync(HEARTBEAT_DIR)) {
-    fs.mkdirSync(HEARTBEAT_DIR, { recursive: true, mode: 0o755 });
+export async function updateAgentStatus(
+  agentKey: string,
+  state: AgentState,
+  options: AgentStatusOptions = {}
+) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL not configured');
   }
+
+  const pool = getPgPool(databaseUrl);
+  const normalizedState = state === 'running' ? 'running' : state;
+
+  await pool.query(
+    `INSERT INTO agents (agent_key, display_name, description, state, last_seen_at)
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (agent_key) DO UPDATE SET
+       display_name = COALESCE(EXCLUDED.display_name, agents.display_name),
+       description = COALESCE(EXCLUDED.description, agents.description),
+       state = EXCLUDED.state,
+       last_seen_at = NOW()`,
+    [agentKey, options.displayName || agentKey, options.description || null, normalizedState]
+  );
 }
 
-/**
- * 更新 agent 状态（写入心跳文件）
- */
-export async function updateAgentStatus(agentKey: string, state: 'running' | 'idle' | 'active') {
-  try {
-    ensureHeartbeatDir();
-    
-    const heartbeatFile = path.join(HEARTBEAT_DIR, `agent-${agentKey}.heartbeat`);
-    const data = {
-      agent_key: agentKey,
-      state: state,
-      last_seen_at: new Date().toISOString(),
-      updated_at: Date.now(),
-    };
-    
-    // 原子写入
-    const tempFile = heartbeatFile + '.tmp';
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), { mode: 0o644 });
-    fs.renameSync(tempFile, heartbeatFile);
-    
-    console.log(`[AgentStatus] ${agentKey} → ${state}`);
-  } catch (e) {
-    console.error('[AgentStatus] Failed to update status:', e);
-  }
-}
-
-/**
- * 包装 sessions_spawn，自动更新状态
- * 在 spawn 前调用此函数
- */
 export async function withAgentStatus<T>(
   agentKey: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options: AgentStatusOptions = {}
 ): Promise<T> {
-  // 开始工作
-  await updateAgentStatus(agentKey, 'running');
-  
+  await updateAgentStatus(agentKey, 'running', options);
+
   try {
-    const result = await fn();
-    return result;
-  } catch (e) {
-    throw e;
+    return await fn();
   } finally {
-    // 完成后设置为 idle（可选，超时会自动 idle）
-    // await updateAgentStatus(agentKey, 'idle');
+    await updateAgentStatus(agentKey, 'idle', options);
   }
 }

@@ -1,123 +1,153 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const MEMORY_TOPICS_DIR = path.join(process.cwd(), '../../.openclaw/workspace/memory/topics');
-
-interface MemoryTopic {
-  id: number;
-  title: string;
-  category: 'topic';
-  ref_path: string;
-  summary: string;
-  happened_at: string;
-  slug: string;
-}
+import { getPgPool } from '../_lib/pg';
+import { buildMeta, buildPagination, withLegacyListShape } from '../_lib/response';
 
 export async function GET(request: NextRequest) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+  }
+
+  const searchParams = request.nextUrl.searchParams;
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
+  const category = searchParams.get('category');
+  const search = searchParams.get('search');
+
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.min(100, Math.max(1, pageSize));
+  const offset = (safePage - 1) * safePageSize;
+
+  const pool = getPgPool(databaseUrl);
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const search = searchParams.get('search') || '';
-    
-    // 读取本地记忆主题目录
-    const topicsDir = MEMORY_TOPICS_DIR;
-    let files: string[] = [];
-    
-    try {
-      files = await fs.readdir(topicsDir);
-      files = files.filter(f => f.endsWith('.md'));
-    } catch (err) {
-      console.error('Memory topics dir not found:', topicsDir, err);
-      return NextResponse.json({
-        data: { memories: [] },
-        meta: { source: 'local', last_sync_at: new Date().toISOString() },
-        memories: [],
-        count: 0,
-        data_source: 'local',
-      });
+    const whereClauses: string[] = [];
+    const queryParams: Array<string | number> = [];
+    let paramIndex = 1;
+
+    if (category) {
+      whereClauses.push(`category = $${paramIndex}`);
+      queryParams.push(category);
+      paramIndex++;
     }
-    
-    const memories: MemoryTopic[] = [];
-    
-    for (const file of files) {
-      const slug = file.replace('.md', '');
-      const filePath = path.join(topicsDir, file);
-      
-      try {
-        const content = await fs.readFile(filePath, 'utf-8');
-        const lines = content.split('\n');
-        
-        // 提取标题（第一个非空行或 # 标题）
-        let title = slug;
-        let summary = '';
-        
-        for (const line of lines) {
-          if (line.startsWith('# ')) {
-            title = line.substring(2).trim();
-            break;
-          } else if (line.trim() && !line.startsWith('>') && !line.startsWith('---')) {
-            title = line.trim().substring(0, 50);
-            break;
-          }
-        }
-        
-        // 提取摘要（第一段的非标题内容）
-        const summaryLines: string[] = [];
-        let inContent = false;
-        for (const line of lines) {
-          if (line.startsWith('# ')) {
-            inContent = true;
-            continue;
-          }
-          if (inContent && line.trim() && !line.startsWith('---')) {
-            if (line.startsWith('>')) {
-              summaryLines.push(line.substring(1).trim());
-            } else if (line.startsWith('-') || line.startsWith('*')) {
-              summaryLines.push(line.substring(1).trim());
-            } else {
-              summaryLines.push(line.trim());
-            }
-            if (summaryLines.length >= 2) break;
-          }
-        }
-        summary = summaryLines.join(' | ').substring(0, 200);
-        
-        if (search && !title.toLowerCase().includes(search.toLowerCase()) && !summary.toLowerCase().includes(search.toLowerCase())) {
-          continue;
-        }
-        
-        memories.push({
-          id: memories.length + 1,
-          title,
-          category: 'topic',
-          ref_path: `memory/topics/${file}`,
-          summary,
-          happened_at: new Date().toISOString(),
-          slug,
-        });
-      } catch (err) {
-        console.error(`Error reading ${file}:`, err);
-      }
+
+    if (search) {
+      whereClauses.push(`(title ILIKE $${paramIndex} OR summary ILIKE $${paramIndex})`);
+      queryParams.push(`%${search}%`);
+      paramIndex++;
     }
-    
-    // 按标题排序
-    memories.sort((a, b) => a.title.localeCompare(b.title));
-    
-    return NextResponse.json({
-      data: { memories },
-      meta: { source: 'local', last_sync_at: new Date().toISOString() },
-      memories,
-      count: memories.length,
-      data_source: 'local',
-      last_sync_at: new Date().toISOString(),
+
+    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const countQuery = `SELECT COUNT(*) AS total, MAX(happened_at) AS data_updated_at FROM memories ${whereClause}`;
+    const countResult = await pool.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
+    const result = await pool.query(
+      `SELECT id, title, category, ref_path, summary, happened_at
+       FROM memories
+       ${whereClause}
+       ORDER BY happened_at DESC NULLS LAST, id DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...queryParams, safePageSize, offset]
+    );
+
+    const pagination = buildPagination({
+      page: safePage,
+      pageSize: safePageSize,
+      total,
     });
-  } catch (err) {
-    console.error('Failed to fetch memories:', err);
+
+    const meta = buildMeta({
+      source: 'supabase',
+      lastSyncAt: new Date().toISOString(),
+      dataUpdatedAt: countResult.rows[0]?.data_updated_at || null,
+    });
+
+    return NextResponse.json(
+      withLegacyListShape({
+        key: 'memories',
+        rows: result.rows,
+        data: {
+          memories: result.rows,
+          pagination,
+          filters: {
+            category,
+            search,
+          },
+        },
+        meta,
+        pagination,
+        extra: {
+          filters: {
+            category,
+            search,
+          },
+        },
+      })
+    );
+  } catch (error) {
+    console.error('Failed to fetch memories:', error);
+    return NextResponse.json({ error: 'Failed to fetch memories' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+  }
+
+  try {
+    const { title, category = 'other', ref_path = null, summary = null, happened_at = null } = await request.json();
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return NextResponse.json({ error: 'title is required' }, { status: 400 });
+    }
+
+    const pool = getPgPool(databaseUrl);
+    const result = await pool.query(
+      `INSERT INTO memories (title, category, ref_path, summary, happened_at)
+       VALUES ($1, $2, $3, $4, COALESCE($5, NOW()))
+       RETURNING id, title, category, ref_path, summary, happened_at`,
+      [title.trim(), category, ref_path, summary, happened_at]
+    );
+
     return NextResponse.json({
-      error: 'Failed to fetch memories',
-      data: { memories: [] },
-      memories: [],
-      count: 0,
-    }, { status: 500 });
+      success: true,
+      memory: result.rows[0],
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Failed to create memory:', error);
+    return NextResponse.json({ error: 'Failed to create memory' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+  }
+
+  const id = request.nextUrl.searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
+
+  const pool = getPgPool(databaseUrl);
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM memories WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: 'Memory not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, id: Number(id) });
+  } catch (error) {
+    console.error('Failed to delete memory:', error);
+    return NextResponse.json({ error: 'Failed to delete memory' }, { status: 500 });
   }
 }

@@ -865,8 +865,8 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObj
                     ) : (
                       data.extra?.linked_pipeline_id && (
                         <DetailField label="关联流程" icon="pipelines">
-                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.linked_pipeline_id, type: 'pipeline', title: `流程 #${data.extra.linked_pipeline_id}` })}>
-                            流程 #{data.extra.linked_pipeline_id}
+                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra?.linked_pipeline_id!, type: 'pipeline', title: `流程 #${data.extra?.linked_pipeline_id}` })}>
+                            流程 #{data.extra?.linked_pipeline_id}
                           </span>
                         </DetailField>
                       )
@@ -891,8 +891,8 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObj
                     ) : (
                       data.extra?.linked_event_id && (
                         <DetailField label="关联日程" icon="calendar">
-                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.linked_event_id, type: 'event', title: `日程 #${data.extra.linked_event_id}` })}>
-                            日程 #{data.extra.linked_event_id}
+                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra?.linked_event_id!, type: 'event', title: `日程 #${data.extra?.linked_event_id}` })}>
+                            日程 #{data.extra?.linked_event_id}
                           </span>
                         </DetailField>
                       )

@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { buildMeta } from '../../_lib/response';
+import { getMemoryTopicsDir } from '@/lib/memory-topics';
 
-const TOPICS_DIR = '/home/pve/.openclaw/workspace/memory/topics';
+const TOPICS_DIR = getMemoryTopicsDir();
 
 function safeSlug(input: string) {
   const slug = (input || '').trim();

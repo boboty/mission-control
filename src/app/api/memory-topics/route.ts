@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
+import { getMemoryTopicsDir } from '@/lib/memory-topics';
 
-const TOPICS_DIR = '/home/pve/.openclaw/workspace/memory/topics';
+const TOPICS_DIR = getMemoryTopicsDir();
 
 function safeSlug(input: string) {
   const slug = (input || '').trim();
@@ -38,7 +39,29 @@ export async function GET() {
       index = '';
     }
 
-    const entries = await fs.readdir(TOPICS_DIR, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await fs.readdir(TOPICS_DIR, { withFileTypes: true });
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        const meta = buildMeta({
+          source: 'local',
+          lastSyncAt: new Date().toISOString(),
+          dataUpdatedAt: null,
+        });
+
+        return NextResponse.json(
+          withLegacyListShape({
+            key: 'topics',
+            rows: [],
+            data: { topics: [], index: index || null },
+            meta,
+            extra: { index: index || null },
+          })
+        );
+      }
+      throw error;
+    }
 
     // Build list from directory; use INDEX.md to sort if possible.
     const mdFiles = entries

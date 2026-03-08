@@ -16,6 +16,8 @@ interface LeftNavProps {
   onModuleChange?: (module: string) => void;
   collapsed?: boolean;
   onToggle?: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 const navItems: NavItem[] = [
