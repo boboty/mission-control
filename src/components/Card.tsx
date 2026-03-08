@@ -26,7 +26,7 @@ export function Card({ children, className = '', hover = true, padding = 'md' }:
         border border-[var(--border-light)] dark:border-[var(--border-medium)] 
         shadow-[var(--shadow-sm)] dark:shadow-[var(--shadow-md)]
         ${hover 
-          ? 'hover:shadow-[var(--shadow-lg)] dark:hover:shadow-[var(--shadow-xl)] hover:border-[var(--border-medium)] dark:hover:border-[var(--border-dark)] hover:-translate-y-0.5 transition-all duration-200 ease-out' 
+          ? 'hover:shadow-[var(--shadow-lg)] dark:hover:shadow-[var(--shadow-xl)] hover:border-[var(--border-medium)] dark:hover:border-[var(--border-dark)] transition-all duration-200 ease-out' 
           : ''}
         ${paddingClasses[padding]}
         ${className}

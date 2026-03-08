@@ -503,6 +503,252 @@ html {
   }
 }
 
+/* ========== 移动端适配 - 侧边栏抽屉式 ========== */
+@media (max-width: 768px) {
+  /* 移动端侧边栏默认隐藏，通过汉堡菜单控制 */
+  .mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 40;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  
+  .mobile-nav-overlay.open {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  /* 移动端侧边栏样式 */
+  .mobile-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .mobile-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* ========== 移动端底部导航 ========== */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+    z-index: 50;
+    padding: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* ========== 移动端字体大小适配 ========== */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px; /* 基础字体稍小，但确保可读性 */
+  }
+  
+  h1 {
+    font-size: 1.5rem !important; /* 24px */
+  }
+  
+  h2 {
+    font-size: 1.25rem !important; /* 20px */
+  }
+  
+  h3 {
+    font-size: 1.125rem !important; /* 18px */
+  }
+}
+
+/* ========== 移动端触摸友好 ========== */
+@media (max-width: 768px) {
+  /* 增大按钮点击区域 */
+  .btn, button, a[role="button"] {
+    min-height: 44px; /* iOS 推荐最小触摸目标 */
+    min-width: 44px;
+  }
+  
+  /* 增大输入框高度 */
+  input, textarea, select {
+    min-height: 44px;
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+  }
+  
+  /* 增大列表项点击区域 */
+  .clickable-item, [role="button"], [tabindex="0"] {
+    min-height: 48px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  
+  /* 禁用 hover 效果（触摸设备无 hover） */
+  .card:hover,
+  .btn:hover,
+  tr:hover {
+    transform: none;
+  }
+}
+
+/* 触摸目标工具类 - 用于所有可点击元素 */
+.touch-target {
+  min-height: 48px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+button.touch-target,
+a.touch-target {
+  min-height: 44px;
+}
+
+/* ========== 移动端卡片堆叠布局 ========== */
+@media (max-width: 640px) {
+  .card-grid,
+  .dashboard-grid,
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-4) !important;
+  }
+  
+  /* 单列布局优化 */
+  .md\:grid-cols-2,
+  .lg\:grid-cols-3,
+  .xl\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ========== 移动端表格转卡片 ========== */
+@media (max-width: 640px) {
+  /* 表格隐藏表头 */
+  table thead {
+    display: none;
+  }
+  
+  /* 表格行变卡片 */
+  table tbody tr {
+    display: block;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  
+  table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border-light);
+    text-align: right;
+  }
+  
+  table tbody td:last-child {
+    border-bottom: none;
+  }
+  
+  /* 为单元格添加标签（需要 data-label 属性） */
+  table tbody td::before {
+    content: attr(data-label);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
+    margin-right: var(--space-4);
+  }
+}
+
+/* ========== 移动端页面布局调整 ========== */
+@media (max-width: 768px) {
+  /* 主内容区取消侧边栏占位 */
+  main {
+    margin-left: 0 !important;
+    padding-bottom: 70px; /* 为底部导航留空间 */
+  }
+  
+  /* 顶部 header 调整 */
+  header {
+    margin-bottom: var(--space-6) !important;
+  }
+  
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  
+  /* 卡片内边距减小 */
+  .card {
+    padding: var(--space-4) !important;
+  }
+  
+  /* 指标卡片调整 */
+  .metric-group {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-3) !important;
+  }
+}
+
+/* ========== 移动端汉堡菜单按钮 ========== */
+.hamburger-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  
+  .hamburger-btn:active {
+    transform: scale(0.95);
+  }
+}
+
+/* ========== 移动端隐藏元素 ========== */
+.hide-mobile {
+  display: none !important;
+}
+
+@media (min-width: 769px) {
+  .hide-mobile {
+    display: block !important;
+  }
+}
+
+.show-mobile {
+  display: block !important;
+}
+
+@media (min-width: 769px) {
+  .show-mobile {
+    display: none !important;
+  }
+}
+
 /* ========== 网格布局辅助 ========== */
 .grid-auto-fit {
   display: grid;

@@ -973,6 +973,7 @@ export function ClickableItem({ children, onClick, className = '', isBlocked = f
         hover:shadow-md hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]
         focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset focus:ring-offset-2 focus:ring-offset-[var(--bg-secondary)] dark:focus:ring-offset-[var(--bg-tertiary)]
         active:scale-[0.98]
+        min-h-[48px] touch-target
         ${isBlocked 
           ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)]' 
           : ''

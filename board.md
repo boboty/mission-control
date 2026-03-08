@@ -470,3 +470,128 @@ T-20260222-003: 任务看板单模块视图改进 - 分页/筛选/搜索
 - 使用统一的 CSS 变量和 design tokens
 - 支持暗色模式
 - 所有改动向后兼容
+
+---
+
+## 任务 #96 - 移动端适配优化
+
+**状态**: ✅ 已完成  
+**优先级**: P1  
+**创建时间**: 2026-03-08  
+**完成时间**: 2026-03-08  
+
+#### 需求描述
+优化 Mission Control 手机端体验，让移动设备用户也能高效使用系统。
+
+#### 功能需求
+1. ✅ 侧边栏改为抽屉式（汉堡菜单展开/收起）
+2. ✅ 卡片堆叠布局（单列显示）
+3. ✅ 触摸友好（更大的点击区域、滑动操作）
+4. ✅ 字体大小适配（移动端可读）
+5. ✅ 表格视图在移动端改为卡片式
+6. ✅ 底部导航（替代侧边栏）
+
+#### 技术要求
+- ✅ 使用 Tailwind 响应式断点（sm: 640px, md: 768px）
+- ✅ 测试关键页面：仪表盘、任务看板、管线视图
+- ✅ 保持与现有 UI 风格一致
+- ✅ npm run build 通过
+
+#### 实现内容
+
+**核心样式** (`src/app/globals.css`):
+- 移动端侧边栏抽屉式样式（`.mobile-nav-overlay`, `.mobile-sidebar`）
+- 底部导航样式（`.mobile-bottom-nav`）
+- 移动端字体大小适配
+- 触摸友好样式（`.touch-target`, 最小 44px 点击区域）
+- 移动端卡片堆叠布局
+- 表格转卡片样式
+- 汉堡菜单按钮样式（`.hamburger-btn`）
+- 显示/隐藏工具类（`.hide-mobile`, `.show-mobile`）
+
+**组件更新**:
+- `LeftNav.tsx`: 支持移动端抽屉，自动检测设备类型，点击导航项自动关闭
+- `Card.tsx`: 移除移动端 hover 位移效果
+- `DetailModal.tsx`: ClickableItem 添加最小高度 48px
+- `TaskBoard.tsx`: 任务项触摸优化，筛选器移动端布局，看板视图横向滚动
+- `Pipeline.tsx`: 流程项触摸优化
+- `TeamOverview.tsx`: 智能体项触摸优化
+
+**页面更新** (`src/app/page.tsx`):
+- 添加移动端状态检测
+- 集成汉堡菜单按钮
+- 添加底部导航栏（6 个模块入口）
+- 主内容区响应式边距
+- 移动端简化顶部操作区
+
+#### 响应式断点
+
+| 断点 | 宽度 | 布局 |
+|------|------|------|
+| 移动端 | ≤768px | 单列、抽屉导航、底部导航 |
+| 平板 | 768px-1024px | 2 列卡片、侧边栏 |
+| 桌面 | >1024px | 3 列卡片、侧边栏 |
+
+#### 触摸优化
+
+- 最小触摸目标：44x44px（iOS 标准）
+- 列表项最小高度：48px
+- 输入框/按钮最小高度：44px
+- 移动端输入框字体：16px（防止 iOS 缩放）
+- 禁用触摸设备 hover 位移效果
+
+#### 交付物
+- [x] 自测通过
+- [x] 文档：docs/MOBILE_RESPONSIVE_SUMMARY.md
+- [x] npm run build 通过
+- [x] 关键页面测试：仪表盘、任务看板、管线视图
+
+#### 测试步骤
+1. ✅ 在手机浏览器打开网站（或 Chrome DevTools 移动模式）
+2. ✅ 验证汉堡菜单正常打开/关闭
+3. ✅ 验证底部导航显示且可点击
+4. ✅ 验证卡片单列显示
+5. ✅ 验证任务列表触摸友好
+6. ✅ 验证看板视图横向滚动
+7. ✅ 验证所有按钮/输入框易于点击
+8. ✅ 验证字体大小可读
+9. ✅ npm run build 通过
+
+#### 修改文件清单
+
+```
+src/app/globals.css                    - 移动端响应式样式
+src/app/page.tsx                       - 主页面布局、汉堡菜单、底部导航
+src/components/LeftNav.tsx             - 抽屉式导航
+src/components/Card.tsx                - 移除移动端 hover
+src/components/DetailModal.tsx         - ClickableItem 触摸优化
+src/components/dashboard/TaskBoard.tsx - 任务项触摸优化
+src/components/dashboard/Pipeline.tsx  - 流程项触摸优化
+src/components/dashboard/TeamOverview.tsx - 智能体项触摸优化
+docs/MOBILE_RESPONSIVE_SUMMARY.md      - 完整报告
+```
+
+#### 备注
+- 保持与现有 UI 风格完全一致
+- 所有改动向后兼容，不影响桌面端体验
+- 使用现有 CSS 变量和 design tokens
+- 支持亮色/暗色模式
+- 后续可添加手势支持、PWA、离线模式
+
+```
+任务 #96: 移动端适配优化 - 完成
+
+实现内容:
+- 侧边栏抽屉式（汉堡菜单）
+- 卡片堆叠布局（单列）
+- 触摸友好（44px+ 点击区域）
+- 字体大小适配
+- 表格转卡片
+- 底部导航栏
+
+测试:
+- 关键页面验证：仪表盘、任务看板、管线视图
+- npm run build 通过
+- 文档：docs/MOBILE_RESPONSIVE_SUMMARY.md
+```
+

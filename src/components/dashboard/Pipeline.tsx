@@ -54,7 +54,7 @@ export function PipelineItem({ item, onClick }: { item: PipelineType; onClick: (
   return (
     <ClickableItem
       onClick={onClick}
-      className={`group relative rounded-xl border border-[var(--border-light)] bg-[var(--surface-elevated)]/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-[var(--shadow-md)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${stageStyle.glow}`}
+      className={`group relative rounded-xl border border-[var(--border-light)] bg-[var(--surface-elevated)]/80 px-3 py-3 sm:py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-[var(--shadow-md)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset min-h-[48px] touch-target ${stageStyle.glow}`}
       aria-label={`流程项目：${item.item_name}，阶段：${item.stage}`}
     >
       <div
@@ -79,13 +79,13 @@ export function Pipeline({ pipelines, openDetail }: PipelineProps) {
         icon="empty-pipeline"
         title="暂无流程"
         description="当前没有进行中的流程项目"
-        action={<button className="btn btn-primary">新建流程</button>}
+        action={<button className="btn btn-primary min-h-[44px]">新建流程</button>}
       />
     );
   }
 
   return (
-    <div className="overflow-y-auto space-y-2">
+    <div className="overflow-y-auto space-y-2 -mx-2 px-2">
       {pipelines.map((item) => (
         <PipelineItem key={item.id} item={item} onClick={() => openDetail(pipelineToDetail(item))} />
       ))}

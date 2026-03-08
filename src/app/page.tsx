@@ -636,7 +636,16 @@ export default function Dashboard() {
   
   // 导航状态
   const [navCollapsed, setNavCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeModule, setActiveModule] = useState('dashboard');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // 数据验证状态
   const [dataValidation, setDataValidation] = useState<Record<string, { valid: boolean; warnings: string[] }>>({});
@@ -1045,76 +1054,69 @@ export default function Dashboard() {
         onModuleChange={setActiveModule}
         collapsed={navCollapsed}
         onToggle={() => setNavCollapsed(!navCollapsed)}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
       />
       
       {/* 主内容区 */}
-      <main className={`transition-all duration-300 ${navCollapsed ? 'ml-16' : 'ml-64'}`}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 max-w-7xl mx-auto">
+      <main className={`transition-all duration-300 ${isMobile ? 'ml-0' : navCollapsed ? 'ml-16' : 'ml-64'}`}>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 max-w-7xl mx-auto">
           
           {/* 顶部标题区 - 优化布局 */}
-          <header className="mb-10">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-              <div>
-                <h1 className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">
-                  {activeModule === 'dashboard' ? '任务控制中心' : MODULE_CONFIG.find(m => m.key === activeModule)?.name || '模块'}
-                </h1>
-                <p className="text-[var(--text-secondary)] mt-2.5 text-sm flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] font-medium">
+          <header className="mb-6 sm:mb-10">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  {/* 移动端汉堡菜单 */}
+                  {isMobile && (
+                    <button
+                      onClick={() => setMobileNavOpen(true)}
+                      className="hamburger-btn flex-shrink-0"
+                      aria-label="打开导航菜单"
+                    >
+                      <Icon name="menu" size={22} color="var(--text-secondary)" />
+                    </button>
+                  )}
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] tracking-tight truncate">
+                    {activeModule === 'dashboard' ? '任务控制中心' : MODULE_CONFIG.find(m => m.key === activeModule)?.name || '模块'}
+                  </h1>
+                </div>
+                <p className="text-[var(--text-secondary)] mt-2 text-xs sm:text-sm flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] font-medium text-xs">
                     数据源：{dataSource}
                   </span>
                   {lastUpdated && (
-                    <span className="text-[var(--text-muted)]">
+                    <span className="text-[var(--text-muted)] truncate">
                       · 最近同步：{formatUpdateTime(lastUpdated)}
                     </span>
                   )}
-                  {lastRefreshTime && (
-                    <span className="text-[var(--text-muted)]">
-                      · 刷新：{formatRefreshTime(lastRefreshTime)}
-                    </span>
-                  )}
                   {activeModule !== 'dashboard' && (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-medium text-xs">
+                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-medium text-xs">
                       单模块视图
                     </span>
                   )}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                {activeModule === 'dashboard' && <SystemStatus health={health} />}
-                {/* 自动刷新开关 */}
-                <button
-                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-                  className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    autoRefreshEnabled
-                      ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
-                      : 'bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] text-[var(--text-muted)]'
-                  }`}
-                  title={autoRefreshEnabled ? '自动刷新已启用 (60 秒)' : '自动刷新已禁用'}
-                >
-                  <Icon 
-                    name="clock" 
-                    size={16} 
-                    className="mr-1.5" 
-                  />
-                  自动刷新
-                </button>
-                {/* 手动刷新按钮 */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                {activeModule === 'dashboard' && !isMobile && <SystemStatus health={health} />}
+                {/* 手动刷新按钮 - 移动端简化 */}
                 <button
                   onClick={() => refreshAllData(true)}
                   disabled={isRefreshing}
-                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`inline-flex items-center justify-center p-2 sm:px-4 sm:py-2 rounded-lg text-sm font-medium transition-all min-w-[44px] min-h-[44px] ${
                     isRefreshing
                       ? 'bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] text-[var(--text-muted)] cursor-not-allowed'
                       : 'bg-[var(--color-primary)] text-white hover:opacity-90'
                   }`}
                   title="手动刷新所有数据"
+                  aria-label="刷新数据"
                 >
                   <Icon 
                     name="refresh" 
-                    size={16} 
-                    className="mr-1.5" 
+                    size={18} 
+                    className={isRefreshing ? 'animate-spin' : ''}
                   />
-                  {isRefreshing ? '刷新中...' : '刷新'}
+                  {!isMobile && <span className="ml-1.5">{isRefreshing ? '刷新中...' : '刷新'}</span>}
                 </button>
               </div>
             </div>
@@ -1362,7 +1364,7 @@ export default function Dashboard() {
               )}
 
               {/* 模块卡片网格 - 优化间距和视觉 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {loading ? (
                   MODULE_CONFIG.map((_, i) => <SkeletonCard key={i} lines={4} />)
                 ) : (
@@ -1417,8 +1419,54 @@ export default function Dashboard() {
             </>
           )}
 
-          {/* 底部状态栏 - 优化视觉 */}
-          <footer className="mt-12 mb-6">
+          {/* 移动端底部导航 */}
+          {isMobile && (
+            <nav className="mobile-bottom-nav" role="navigation" aria-label="底部导航">
+              {MODULE_CONFIG.slice(0, 5).map((module) => (
+                <button
+                  key={module.key}
+                  onClick={() => setActiveModule(module.key)}
+                  className={`flex-1 flex flex-col items-center justify-center py-2 min-w-[50px] transition-colors ${
+                    activeModule === module.key
+                      ? 'text-[var(--color-primary)]'
+                      : 'text-[var(--text-muted)]'
+                  }`}
+                  aria-label={module.label}
+                  aria-current={activeModule === module.key ? 'page' : undefined}
+                >
+                  <Icon 
+                    name={module.icon} 
+                    size={22} 
+                    color={activeModule === module.key ? 'var(--color-primary)' : 'var(--text-muted)'}
+                    className="mb-0.5"
+                  />
+                  <span className="text-[10px] font-medium truncate w-full text-center">
+                    {module.label.slice(0, 2)}
+                  </span>
+                </button>
+              ))}
+              <button
+                onClick={() => setActiveModule('health')}
+                className={`flex-1 flex flex-col items-center justify-center py-2 min-w-[50px] transition-colors ${
+                  activeModule === 'health'
+                    ? 'text-[var(--color-primary)]'
+                    : 'text-[var(--text-muted)]'
+                }`}
+                aria-label="运行健康"
+              >
+                <Icon 
+                  name="health" 
+                  size={22} 
+                  color={activeModule === 'health' ? 'var(--color-primary)' : 'var(--text-muted)'}
+                  className="mb-0.5"
+                />
+                <span className="text-[10px] font-medium">健康</span>
+              </button>
+            </nav>
+          )}
+
+          {/* 底部状态栏 - 优化视觉（桌面端显示） */}
+          <footer className="mt-12 mb-6 hide-mobile">
             <Card hover={false} padding="md">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div className="flex items-center space-x-3">

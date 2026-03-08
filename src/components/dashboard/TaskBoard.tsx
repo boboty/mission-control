@@ -62,9 +62,9 @@ export function SortableTaskItem({
       tabIndex={0}
       role="button"
       aria-label={`任务：${task.title}`}
-      className={`group mb-2 cursor-grab rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:cursor-grabbing active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${isDragging ? 'opacity-60 shadow-lg rotate-2' : ''} ${selected ? 'ring-2 ring-[var(--color-primary)] bg-[var(--color-primary)]/5' : ''}`}
+      className={`group mb-2 cursor-grab rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 sm:p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:cursor-grabbing active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset min-h-[48px] touch-target ${isDragging ? 'opacity-60 shadow-lg rotate-2' : ''} ${selected ? 'ring-2 ring-[var(--color-primary)] bg-[var(--color-primary)]/5' : ''}`}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 sm:gap-3">
         {onToggleSelect && (
           <input
             type="checkbox"
@@ -74,12 +74,12 @@ export function SortableTaskItem({
               onToggleSelect(task.id);
             }}
             onClick={(e) => e.stopPropagation()}
-            className="mt-0.5 h-4 w-4 rounded border-[var(--border-medium)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0"
+            className="mt-1 h-4 w-4 sm:h-5 sm:w-5 rounded border-[var(--border-medium)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0 flex-shrink-0"
           />
         )}
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium text-[var(--text-primary)] line-clamp-2">{task.title}</div>
-          {task.priority === 'high' && <span className="mt-1.5 inline-block rounded-md bg-[var(--badge-warning-bg)] px-1.5 py-0.5 text-[10px] text-[var(--badge-warning-text)] font-medium animate-pulse-soft">高优</span>}
+          <div className="text-xs sm:text-sm font-medium text-[var(--text-primary)] line-clamp-2">{task.title}</div>
+          {task.priority === 'high' && <span className="mt-1.5 inline-block rounded-md bg-[var(--badge-warning-bg)] px-2 py-1 text-[10px] sm:text-xs text-[var(--badge-warning-text)] font-medium animate-pulse-soft">高优</span>}
         </div>
       </div>
     </div>
@@ -100,8 +100,8 @@ export function TaskItem({
   const isBlocked = task.blocker || task.status === 'blocked';
   return (
     <ClickableItem onClick={onClick} isBlocked={isBlocked} className="-mx-2 px-2 rounded-lg">
-      <div className={`flex items-start justify-between py-2.5 border-b border-[var(--border-light)] last:border-0 transition-all duration-200 ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-1' : ''} ${selected ? 'bg-[var(--color-primary)]/5' : ''}`}>
-        <div className="flex-1 min-w-0 flex items-start gap-2">
+      <div className={`flex items-start justify-between py-3 sm:py-2.5 border-b border-[var(--border-light)] last:border-0 transition-all duration-200 min-h-[48px] touch-target ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-2' : ''} ${selected ? 'bg-[var(--color-primary)]/5' : ''}`}>
+        <div className="flex-1 min-w-0 flex items-start gap-2 sm:gap-3">
           {onToggleSelect && (
             <input
               type="checkbox"
@@ -111,16 +111,17 @@ export function TaskItem({
                 onToggleSelect(task.id);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="mt-0.5 h-4 w-4 rounded border-[var(--border-medium)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0"
+              className="mt-1 h-4 w-4 sm:h-5 sm:w-5 rounded border-[var(--border-medium)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0 flex-shrink-0"
             />
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap">
               <span className={`text-sm truncate ${isBlocked || task.priority === 'high' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{task.title}</span>
-              {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium animate-pulse-soft">🚫 阻塞</span>}
+              {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium animate-pulse-soft flex-shrink-0">🚫 阻塞</span>}
+              {task.priority === 'high' && !task.blocker && <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-2 py-0.5 rounded-full font-medium flex-shrink-0">高优</span>}
             </div>
             {task.next_action && <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>}
-            {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center"><span className="mr-1">📅</span> 截止：{formatDate(task.due_at)}</p>}
+            {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center flex-wrap"><span className="mr-1 flex-shrink-0">📅</span> <span className="truncate">截止：{formatDate(task.due_at)}</span></p>}
           </div>
         </div>
         <StatusBadge status={task.status} size="sm" />
@@ -381,25 +382,50 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
       )}
 
       <div className="space-y-3 mb-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
+        <div className="flex flex-col gap-3">
+          <div className="relative">
             <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-            <input value={taskSearch} onChange={(e) => setTaskSearch(e.target.value)} placeholder="搜索任务（标题或 ID）..." className="w-full pl-10 pr-4 py-2 text-sm border rounded-lg" />
+            <input 
+              value={taskSearch} 
+              onChange={(e) => setTaskSearch(e.target.value)} 
+              placeholder="搜索任务..." 
+              className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg min-h-[44px]"
+              aria-label="搜索任务"
+            />
           </div>
-          <select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)} className="sm:w-40 px-3 py-2 text-sm border rounded-lg">{STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-          <select value={taskSortBy} onChange={(e) => setTaskSortBy(e.target.value as any)} className="sm:w-36 px-3 py-2 text-sm border rounded-lg"><option value="default">默认排序</option><option value="priority">优先级</option><option value="dueDate">截止日期</option><option value="status">状态</option></select>
+          <div className="flex gap-3">
+            <select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)} className="flex-1 px-3 py-2.5 text-sm border rounded-lg min-h-[44px]" aria-label="筛选状态">
+              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <select value={taskSortBy} onChange={(e) => setTaskSortBy(e.target.value as any)} className="flex-1 px-3 py-2.5 text-sm border rounded-lg min-h-[44px]" aria-label="排序方式">
+              <option value="default">排序</option>
+              <option value="priority">优先级</option>
+              <option value="dueDate">截止</option>
+              <option value="status">状态</option>
+            </select>
+          </div>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-muted)]">{taskPagination ? `共 ${taskPagination.total} 项任务` : ''}</span>
+          <span className="text-xs text-[var(--text-muted)]">{taskPagination ? `共 ${taskPagination.total} 项` : ''}</span>
           <div className="flex items-center space-x-1 rounded-lg p-0.5 border border-[var(--border-light)]">
-            {(['list', 'grouped', 'kanban'] as const).map((mode) => <button key={mode} onClick={() => setTaskViewMode(mode)} className={`px-3 py-1.5 text-xs rounded-md ${taskViewMode === mode ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>{mode === 'list' ? '列表' : mode === 'grouped' ? '分组' : '看板'}</button>)}
+            {(['list', 'grouped', 'kanban'] as const).map((mode) => (
+              <button 
+                key={mode} 
+                onClick={() => setTaskViewMode(mode)} 
+                className={`px-2 sm:px-3 py-1.5 text-xs rounded-md min-h-[36px] min-w-[44px] ${taskViewMode === mode ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}
+                aria-label={`${mode === 'list' ? '列表' : mode === 'grouped' ? '分组' : '看板'}视图`}
+              >
+                <span className="hide-mobile">{mode === 'list' ? '列表' : mode === 'grouped' ? '分组' : '看板'}</span>
+                <span className="show-mobile">{mode === 'list' ? '📋' : mode === 'grouped' ? '🗂' : '📊'}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {taskViewMode === 'kanban' ? (
         <DndContext collisionDetection={closestCenter} onDragStart={(e) => setActiveId(Number(e.active.id))} onDragEnd={handleDragEnd} sensors={sensors}>
-          <div className="grid grid-cols-5 gap-4 overflow-x-auto pb-1">
+          <div className="grid grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-2 px-2">
             {KANBAN_COLUMNS.map((col) => {
               const colTasks = groupTasksByStatus(tasks)[col.id] || [];
               const headerClass =
@@ -413,12 +439,12 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
                         ? 'bg-emerald-500/90'
                         : 'bg-[var(--color-primary)]/90';
               return (
-                <div key={col.id} className="min-w-[220px] rounded-2xl border border-[var(--border-light)]/80 bg-[var(--bg-secondary)]/40 shadow-sm backdrop-blur-sm">
+                <div key={col.id} className="min-w-[240px] sm:min-w-[260px] rounded-2xl border border-[var(--border-light)]/80 bg-[var(--bg-secondary)]/40 shadow-sm backdrop-blur-sm">
                   <div className={`flex items-center justify-between rounded-t-2xl px-3.5 py-2.5 text-xs font-semibold text-white ${headerClass}`}>
-                    <span>{col.title}</span>
-                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px]">{colTasks.length}</span>
+                    <span className="truncate">{col.title}</span>
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] flex-shrink-0">{colTasks.length}</span>
                   </div>
-                  <div className="min-h-[220px] rounded-b-2xl bg-[var(--bg-tertiary)]/80 p-2.5">
+                  <div className="min-h-[200px] sm:min-h-[220px] rounded-b-2xl bg-[var(--bg-tertiary)]/80 p-2">
                     <SortableContext items={colTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                       {colTasks.map((task) => (
                         <SortableTaskItem 
@@ -430,6 +456,9 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
                         />
                       ))}
                     </SortableContext>
+                    {(!colTasks || colTasks.length === 0) && (
+                      <div className="text-center text-xs text-[var(--text-muted)] py-8">暂无</div>
+                    )}
                   </div>
                 </div>
               );

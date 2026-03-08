@@ -36,10 +36,10 @@ function AgentItem({ agent, onClick }: { agent: Agent; onClick: () => void }) {
 
   return (
     <ClickableItem onClick={onClick} className="-mx-2 px-2 rounded-xl group">
-      <div className="flex items-center justify-between gap-3 py-3 px-3 border border-[var(--border-light)] bg-[var(--surface-primary)]/70 rounded-xl mb-2 last:mb-0 transition-all duration-200 hover:border-[var(--primary)]/40 hover:bg-[var(--surface-secondary)] hover:shadow-sm">
+      <div className="flex items-center justify-between gap-3 py-3 px-3 border border-[var(--border-light)] bg-[var(--surface-primary)]/70 rounded-xl mb-2 last:mb-0 transition-all duration-200 hover:border-[var(--primary)]/40 hover:bg-[var(--surface-secondary)] hover:shadow-sm min-h-[48px] touch-target">
         <div className="min-w-0 flex items-center gap-3">
           {/* DiceBear 虚拟头像 */}
-          <div className="h-10 w-10 shrink-0 rounded-full overflow-hidden border-2 transition-colors"
+          <div className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-full overflow-hidden border-2 transition-colors flex-shrink-0"
                style={{ borderColor: online ? '#4ade80' : '#6b7280' }}>
             <img 
               src={getAvatarUrl(agent.agent_key)} 
@@ -47,8 +47,8 @@ function AgentItem({ agent, onClick }: { agent: Agent; onClick: () => void }) {
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium text-[var(--text-secondary)] truncate block">{agent.display_name}</span>
               <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border border-[var(--border-light)] bg-[var(--surface-secondary)] text-[var(--text-muted)]">
                 {groupLabel}
