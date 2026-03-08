@@ -815,6 +815,26 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [autoRefreshEnabled, autoRefreshInterval, refreshAllData]);
 
+  // 创建日程
+  const createEvent = async (eventData: { title: string; starts_at: string; ends_at?: string; type?: string }) => {
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventData),
+      });
+      if (res.ok) {
+        alert('日程创建成功！');
+        fetchEvents(1);
+      } else {
+        const error = await res.json();
+        alert(`创建失败：${error.error || '未知错误'}`);
+      }
+    } catch (err) {
+      alert(`创建失败：${err}`);
+    }
+  };
+
   // 获取任务数据（支持分页、筛选、搜索）
   const fetchTasks = useCallback(async (page = 1) => {
     setTaskLoading(true);
@@ -1081,7 +1101,20 @@ export default function Dashboard() {
           return <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>;
         }
         if (events.length === 0) {
-          return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" action={<button className="btn btn-primary">新建日程</button>} />;
+          return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" action={
+            <button 
+              onClick={() => {
+                const title = prompt('请输入日程标题：');
+                if (!title) return;
+                const starts_at = prompt('开始时间（格式：2026-03-08T14:00）：');
+                if (!starts_at) return;
+                createEvent({ title, starts_at });
+              }}
+              className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
+            >
+              新建日程
+            </button>
+          } />;
         }
         return (
           <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
@@ -1508,6 +1541,7 @@ export default function Dashboard() {
                                   module.key === 'events' ? `共 ${eventPagination?.total ?? events.length} 项日程` :
                                   module.key === 'memory_topics' ? `共 ${memoryTopics.length} 个主题` :
                                   module.key === 'agents' ? `共 ${agents.length} 个智能体` :
+                                  module.key === 'events' ? `共 ${events.length} 项日程` :
                                   `共 ${health.length} 次检测`
                                 }
                               />
