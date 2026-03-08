@@ -31,6 +31,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'success': CheckCircle,
   'error': XCircle,
   'warning': AlertTriangle,
+  'alert': AlertTriangle,
   'info': Info,
   
   // 空态图标

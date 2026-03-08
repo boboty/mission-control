@@ -5,9 +5,11 @@ import { DndContext, DragOverlay, closestCenter, useSensor, useSensors, PointerS
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { EmptyState, Icon, StatusBadge, ClickableItem, type DetailData } from '@/components';
+import { PipelineFlowOverview } from '@/components/dashboard/PipelineFlowOverview';
 import type { Pipeline, PaginationInfo } from '@/lib/types';
 import { pipelineToDetail, formatDate } from '@/lib/data-utils';
 import { exportTasksToCSV, exportTasksToPDF } from '@/lib/export-utils';
+import { groupPipelinesByStage, getPipelineName, PIPELINE_COLUMNS, type PipelineStageKey } from '@/features/dashboard/lib/pipeline-flow';
 
 interface PipelineListProps {
   pipelines: Pipeline[];
@@ -16,7 +18,7 @@ interface PipelineListProps {
   openDetail: (data: DetailData) => void;
 }
 
-type PipelineStage = '' | 'draft' | 'in_progress' | 'review' | 'done';
+type PipelineStage = '' | PipelineStageKey;
 
 function SortablePipelineCard({ item, onClick }: { item: Pipeline; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
@@ -32,7 +34,7 @@ function SortablePipelineCard({ item, onClick }: { item: Pipeline; onClick: () =
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item.name}</p>
+          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{getPipelineName(item)}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
             <span>负责人：{item.owner || '未分配'}</span>
             <span>截止：{item.due_at ? formatDate(item.due_at) : '未设置'}</span>
@@ -56,13 +58,6 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
   // Export state
   const [exportLoading, setExportLoading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-
-  const PIPELINE_COLUMNS: Array<{ id: Exclude<PipelineStage, ''>; title: string; headerClass: string }> = [
-    { id: 'draft', title: '草稿', headerClass: 'bg-slate-500/90' },
-    { id: 'in_progress', title: '进行中', headerClass: 'bg-blue-500/90' },
-    { id: 'review', title: '评审中', headerClass: 'bg-violet-500/90' },
-    { id: 'done', title: '已完成', headerClass: 'bg-emerald-500/90' },
-  ];
 
   const owners = useMemo(() => {
     const names = pipelines.map((p) => p.owner).filter(Boolean) as string[];
@@ -144,7 +139,7 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
           };
           return [
             p.id.toString(),
-            `"${(p.name || '').replace(/"/g, '""')}"`,
+            `"${getPipelineName(p).replace(/"/g, '""')}"`,
             stageMap[p.stage || 'draft'] || p.stage,
             p.owner || '',
             fmtDate(p.due_at),
@@ -236,7 +231,7 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
                 ${data.pipelines.map((p: Pipeline) => `
                   <tr>
                     <td>${p.id}</td>
-                    <td>${(p.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+                    <td>${getPipelineName(p).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
                     <td>${stageMap[p.stage || 'draft'] || p.stage}</td>
                     <td>${p.owner || ''}</td>
                     <td>${fmtDate(p.due_at)}</td>
@@ -262,12 +257,7 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
     }
   };
 
-  const groupedByStage = useMemo(() => {
-    return PIPELINE_COLUMNS.reduce((acc, col) => {
-      acc[col.id] = pipelines.filter((p) => (p.stage || 'draft') === col.id);
-      return acc;
-    }, {} as Record<Exclude<PipelineStage, ''>, Pipeline[]>);
-  }, [pipelines]);
+  const groupedByStage = useMemo(() => groupPipelinesByStage(pipelines), [pipelines]);
 
   const handleDragEnd = async ({ active, over }: DragEndEvent) => {
     setActiveId(null);
@@ -314,6 +304,10 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
 
   return (
     <div>
+      <div className="mb-5">
+        <PipelineFlowOverview pipelines={pipelines} openDetail={openDetail} />
+      </div>
+
       <div className="space-y-3 mb-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -399,7 +393,17 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
           <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>
         ) : (
           <DndContext collisionDetection={closestCenter} onDragStart={(e) => setActiveId(Number(e.active.id))} onDragEnd={handleDragEnd} sensors={sensors}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 overflow-x-auto pb-1">
+            <div className="mb-3 flex items-center justify-between gap-3 px-2">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">拖拽推进面板</h3>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">把流程卡拖到下一阶段，页面上方总览会同步反映流转状态。</p>
+              </div>
+              <div className="hidden rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-1 text-xs text-[var(--text-secondary)] sm:block">
+                从左到右表示业务推进顺序
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 overflow-x-auto pb-1 md:grid-cols-2 xl:grid-cols-4">
               {PIPELINE_COLUMNS.map((col) => {
                 const colItems = groupedByStage[col.id] || [];
                 return (
@@ -423,7 +427,7 @@ export function PipelineList({ pipelines, setPipelines, loading, openDetail }: P
             <DragOverlay>
               {activeId ? (
                 <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2.5 text-sm font-medium shadow-xl">
-                  {pipelines.find((p) => p.id === activeId)?.name}
+                  {getPipelineName(pipelines.find((p) => p.id === activeId) as Pipeline)}
                 </div>
               ) : null}
             </DragOverlay>

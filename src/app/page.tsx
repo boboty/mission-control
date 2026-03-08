@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { DetailModal, Icon, LeftNav, type DetailData, type RelatedObject } from '@/components';
+import { DetailModal, Icon, LeftNav, ThemeToggle, type DetailData, type RelatedObject } from '@/components';
 import { formatUpdateTime, eventToDetail, pipelineToDetail, taskToDetail } from '@/lib/data-utils';
 import { DASHBOARD_MODULES, getDashboardModule } from '@/features/dashboard/lib/dashboard-config';
 import { loadTaskTimeline } from '@/features/dashboard/lib/task-timeline';
@@ -140,6 +140,7 @@ export default function Dashboard() {
 
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                 {activeModule === 'dashboard' && !isMobile && <SystemStatus health={dashboard.health} />}
+                <ThemeToggle compact={isMobile} />
                 <button
                   onClick={() => void dashboard.refreshAllData(true)}
                   disabled={dashboard.isRefreshing}

@@ -41,7 +41,7 @@ export function useDashboardData() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped' | 'kanban'>('list');
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped' | 'kanban'>('kanban');
   const [taskPage, setTaskPage] = useState(1);
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);

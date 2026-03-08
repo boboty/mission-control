@@ -7,4 +7,5 @@ export { LeftNav } from './LeftNav';
 export { DecisionCenter } from './DecisionCenter';
 export { AlertCard, aggregateAlerts, type Alert } from './AlertCard';
 export { OpsCard } from './OpsCard';
+export { ThemeToggle } from './ThemeToggle';
 export { MemoryArchive } from './dashboard/MemoryArchive';
