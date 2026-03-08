@@ -265,7 +265,7 @@ export function ModuleContent({
       );
 
     case 'agents':
-      return <TeamOverview agents={agents} openDetail={onOpenDetail} />;
+      return <TeamOverview agents={agents} openDetail={onOpenDetail} showScene={isSingleModule} />;
 
     case 'memory_topics':
       if (topicLoading) {
@@ -305,7 +305,7 @@ export function ModuleContent({
         return <EmptyState moduleType="health" icon="empty-heart" title="暂无数据" description="健康检测数据尚未生成" />;
       }
 
-      return <HealthOverviewCard health={health} lastUpdated={lastUpdated} alerts={alerts} />;
+      return <HealthOverviewCard health={health} lastUpdated={lastUpdated} alerts={alerts} compact={!isSingleModule} />;
 
     default:
       return null;

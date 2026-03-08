@@ -3,6 +3,7 @@
 import { AlertCard, Card, CardHeader, DecisionCenter, Metric, MetricGroup, SkeletonCard } from '@/components';
 import { ModuleContent, type ModuleContentProps } from './ModuleContent';
 import { DASHBOARD_MODULES } from '../lib/dashboard-config';
+import { getAgentSummary, getEventSummary, getMemoryTopicSummary, getPipelineSummary, getTaskSummary } from '../lib/module-summaries';
 import type { Decision, DecisionSummary, PaginationInfo } from '@/lib/types';
 
 function getTrendDirection(value: number) {
@@ -20,19 +21,36 @@ function getModuleSubtitle(
     memoryTopicTotal: number;
     agentTotal: number;
     healthTotal: number;
+  },
+  context: {
+    tasks: ModuleContentProps['tasks'];
+    pipelines: ModuleContentProps['pipelines'];
+    events: ModuleContentProps['events'];
+    memoryTopics: ModuleContentProps['memoryTopics'];
+    agents: ModuleContentProps['agents'];
   }
 ) {
   switch (moduleKey) {
-    case 'tasks':
-      return `共 ${counts.taskTotal} 项任务`;
-    case 'pipelines':
-      return `共 ${counts.pipelineTotal} 项流程`;
-    case 'events':
-      return `共 ${counts.eventTotal} 项日程`;
-    case 'memory_topics':
-      return `共 ${counts.memoryTopicTotal} 个主题`;
-    case 'agents':
-      return `共 ${counts.agentTotal} 个智能体`;
+    case 'tasks': {
+      const summary = getTaskSummary(context.tasks);
+      return `${counts.taskTotal} 项任务 · 阻塞 ${summary.blockedCount} · 高优 ${summary.highPriorityCount}`;
+    }
+    case 'pipelines': {
+      const summary = getPipelineSummary(context.pipelines);
+      return `${counts.pipelineTotal} 项流程 · 临期 ${summary.dueSoonCount} · 逾期 ${summary.overdueCount}`;
+    }
+    case 'events': {
+      const summary = getEventSummary(context.events);
+      return `本月 ${counts.eventTotal} 项 · 今天 ${summary.todayCount} · 7 天内 ${summary.upcomingCount}`;
+    }
+    case 'memory_topics': {
+      const summary = getMemoryTopicSummary(context.memoryTopics);
+      return `${counts.memoryTopicTotal} 个主题 · 有摘要 ${summary.withSummaryCount}`;
+    }
+    case 'agents': {
+      const summary = getAgentSummary(context.agents);
+      return `${counts.agentTotal} 个智能体 · 在线 ${summary.onlineCount} · 空闲 ${summary.idleCount}`;
+    }
     default:
       return `共 ${counts.healthTotal} 次检测`;
   }
@@ -128,7 +146,13 @@ export function DashboardOverview({
                     icon={module.icon}
                     iconColor={module.color}
                     title={module.name}
-                    subtitle={getModuleSubtitle(module.key, counts)}
+                    subtitle={getModuleSubtitle(module.key, counts, {
+                      tasks: moduleContentProps.tasks,
+                      pipelines: moduleContentProps.pipelines,
+                      events: moduleContentProps.events,
+                      memoryTopics: moduleContentProps.memoryTopics,
+                      agents: moduleContentProps.agents,
+                    })}
                   />
                   <div className="border-t border-[var(--border-light)] dark:border-[var(--border-medium)] pt-4">
                     <ModuleContent moduleKey={module.key} isSingleModule={false} {...moduleContentProps} />

@@ -8,6 +8,7 @@ import type { DetailData } from '@/components';
 import type { Event, PaginationInfo, Pipeline, Task } from '@/lib/types';
 import { ModuleContent, type ModuleContentProps } from './ModuleContent';
 import { getDashboardModule } from '../lib/dashboard-config';
+import { ModuleOverviewBanner } from './ModuleOverviewBanner';
 
 export function SingleModuleView({
   activeModule,
@@ -56,6 +57,18 @@ export function SingleModuleView({
         </button>
       </div>
 
+      <ModuleOverviewBanner
+        moduleKey={activeModule}
+        tasks={tasks}
+        pipelines={pipelines}
+        events={events}
+        agents={moduleContentProps.agents}
+        health={moduleContentProps.health}
+        memoryTopics={moduleContentProps.memoryTopics}
+        alertsCount={moduleContentProps.alerts.length}
+        lastUpdated={moduleContentProps.lastUpdated}
+      />
+
       <Card hover={false} padding="none">
         <div className="p-5">
           {activeModule === 'tasks' ? (
@@ -90,7 +103,7 @@ export function SingleModuleView({
           ) : activeModule === 'events' ? (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">日历列表</h2>
+                <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">日历与日程</h2>
                 {eventPagination && <span className="text-xs text-[var(--text-muted)]">当前缓存 {eventPagination.total} 项</span>}
               </div>
               <CalendarList initialEvents={events} loading={eventLoading} openDetail={openDetail} />
