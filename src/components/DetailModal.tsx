@@ -371,8 +371,9 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
             </div>
             <button
               onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] transition-colors"
-              aria-label="关闭"
+              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] transition-all duration-200 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
+              aria-label="关闭详情"
+              title="关闭 (Esc)"
             >
               <Icon name="close" size={18} />
             </button>
@@ -380,13 +381,17 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
 
           {/* 标签页导航 */}
           {(hasTimeline || hasRelated) && (
-            <div className="flex border-b border-[var(--border-light)] dark:border-[var(--border-medium)]">
+            <div className="flex border-b border-[var(--border-light)] dark:border-[var(--border-medium)]" role="tablist" aria-label="详情选项卡">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                role="tab"
+                aria-selected={activeTab === 'details'}
+                aria-controls="details-panel"
+                id="details-tab"
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)] ${
                   activeTab === 'details'
-                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-soft)]/50'
+                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]'
                 }`}
               >
                 详情
@@ -394,10 +399,14 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
               {hasTimeline && (
                 <button
                   onClick={() => setActiveTab('timeline')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                  role="tab"
+                  aria-selected={activeTab === 'timeline'}
+                  aria-controls="timeline-panel"
+                  id="timeline-tab"
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)] ${
                     activeTab === 'timeline'
-                      ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-soft)]/50'
+                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
                   时间线 {data.timeline?.length ? `(${data.timeline.length})` : ''}
@@ -406,10 +415,14 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
               {hasRelated && (
                 <button
                   onClick={() => setActiveTab('related')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                  role="tab"
+                  aria-selected={activeTab === 'related'}
+                  aria-controls="related-panel"
+                  id="related-tab"
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)] ${
                     activeTab === 'related'
-                      ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-soft)]/50'
+                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
                   关联对象 {data.relatedObjects?.length ? `(${data.relatedObjects.length})` : ''}
@@ -419,7 +432,12 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
           )}
 
           {/* 内容区 */}
-          <div className="p-5 overflow-y-auto max-h-[60vh]">
+          <div 
+            className="p-5 overflow-y-auto max-h-[60vh]"
+            id={`${activeTab}-panel`}
+            role="tabpanel"
+            aria-labelledby={`${activeTab}-tab`}
+          >
             {activeTab === 'details' && (
               <>
                 {/* ID + 复制按钮 */}
@@ -433,18 +451,21 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
                     <div className="flex items-center space-x-1">
                       <button
                         onClick={handleCopyId}
-                        className={`text-xs px-2 py-1 rounded-md transition-all ${
+                        className={`text-xs px-2 py-1 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${
                           copied
-                            ? 'bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]'
-                            : 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                            ? 'bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] scale-105'
+                            : 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95'
                         }`}
+                        aria-label="复制 ID"
+                        title={copied ? '已复制！' : '复制 ID'}
                       >
-                        {copied ? '✓' : '复制'}
+                        {copied ? '✓ 已复制' : '📋 复制'}
                       </button>
                       <button
                         onClick={handleCopyLink}
-                        className="text-xs px-2 py-1 rounded-md bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
+                        className="text-xs px-2 py-1 rounded-md bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
                         title="复制链接"
+                        aria-label="复制链接"
                       >
                         🔗
                       </button>
@@ -702,24 +723,36 @@ interface ClickableItemProps {
 }
 
 export function ClickableItem({ children, onClick, className = '', isBlocked = false }: ClickableItemProps) {
+  const handleClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+    // 添加点击反馈
+    const target = e.currentTarget as HTMLElement;
+    target.style.transform = 'scale(0.98)';
+    setTimeout(() => {
+      target.style.transform = '';
+    }, 100);
+    onClick();
+  };
+
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onClick();
+          handleClick(e);
         }
       }}
       tabIndex={0}
       role="button"
       aria-haspopup="dialog"
       className={`
-        cursor-pointer transition-all duration-200 outline-none
-        focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-secondary)] dark:focus:ring-offset-[var(--bg-tertiary)]
+        cursor-pointer transition-all duration-150 ease-out outline-none
+        hover:shadow-md hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]
+        focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset focus:ring-offset-2 focus:ring-offset-[var(--bg-secondary)] dark:focus:ring-offset-[var(--bg-tertiary)]
+        active:scale-[0.98]
         ${isBlocked 
           ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)]' 
-          : 'hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]'
+          : ''
         }
         ${className}
       `}

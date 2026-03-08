@@ -123,9 +123,10 @@ export function AlertCard({ alerts, onDismiss, compact = false }: AlertCardProps
                 {alert.action && (
                   <button
                     onClick={alert.action.onClick}
-                    className={`mt-2 text-xs font-medium ${styles.text} underline underline-offset-2 hover:opacity-80 transition-opacity`}
+                    className={`mt-2 text-xs font-medium ${styles.text} underline underline-offset-2 hover:opacity-80 transition-all duration-200 hover:translate-x-0.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)] rounded`}
+                    aria-label={alert.action.label}
                   >
-                    {alert.action.label}
+                    {alert.action.label} →
                   </button>
                 )}
               </div>
@@ -135,8 +136,9 @@ export function AlertCard({ alerts, onDismiss, compact = false }: AlertCardProps
             {onDismiss && (
               <button
                 onClick={() => onDismiss(alert.id)}
-                className={`flex-shrink-0 p-1 rounded-md ${styles.text} opacity-60 hover:opacity-100 transition-opacity`}
-                aria-label="关闭告警"
+                className={`flex-shrink-0 p-1.5 rounded-md ${styles.text} opacity-60 hover:opacity-100 hover:bg-black/10 transition-all duration-200 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)]`}
+                aria-label={`关闭告警：${alert.title}`}
+                title="关闭此告警"
               >
                 <Icon name="close" size={16} />
               </button>

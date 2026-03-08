@@ -85,46 +85,53 @@ export function LeftNav({ activeModule = 'dashboard', onModuleChange, collapsed 
         )}
         <button
           onClick={onToggle}
-          className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] transition-colors"
+          className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
           title={collapsed ? '展开导航' : '折叠导航'}
+          aria-label={collapsed ? '展开导航菜单' : '折叠导航菜单'}
+          aria-expanded={!collapsed}
         >
           <Icon 
             name={collapsed ? 'chevron-right' : 'chevron-left'} 
             size={18} 
             color="var(--text-secondary)" 
+            className="transition-transform duration-200"
           />
         </button>
       </div>
 
       {/* 导航菜单 */}
-      <nav className="py-4 px-3">
+      <nav className="py-4 px-3" role="navigation" aria-label="主导航">
         {navItems.map((item) => (
           <button
             key={item.key}
             onClick={() => onModuleChange?.(item.key)}
             className={`
               w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl mb-1
-              transition-all duration-200 group
+              transition-all duration-200 ease-out group
               ${
                 activeModule === item.key
-                  ? 'bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] hover:shadow-sm'
               }
+              focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset
             `}
             title={collapsed ? item.label : undefined}
+            aria-current={activeModule === item.key ? 'page' : undefined}
+            aria-label={item.label}
           >
             <Icon 
               name={item.icon} 
               size={20} 
               color={activeModule === item.key ? 'var(--color-primary)' : 'var(--text-secondary)'}
+              className="transition-transform duration-200 group-hover:scale-110"
             />
             {!collapsed && (
-              <span className={`text-sm font-medium ${activeModule === item.key ? 'font-semibold' : ''}`}>
+              <span className={`text-sm font-medium transition-colors duration-200 ${activeModule === item.key ? 'font-semibold' : ''}`}>
                 {item.label}
               </span>
             )}
             {!collapsed && item.key === 'tasks' && blockedCount > 0 && (
-              <span className="ml-auto text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-2 py-0.5 rounded-full" title={`阻塞任务：${blockedCount}`}>
+              <span className="ml-auto text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-2 py-0.5 rounded-full animate-pulse-soft" title={`阻塞任务：${blockedCount}`} role="status" aria-label={`${blockedCount}个阻塞任务`}>
                 {blockedCount}
               </span>
             )}

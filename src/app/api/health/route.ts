@@ -63,6 +63,24 @@ export async function GET() {
         is_stale: nowMs - new Date(row.created_at).getTime() > staleThresholdMs,
       })),
     ];
+    const latestHealth = health[0] ?? null;
+    const status = !latestHealth
+      ? 'unknown'
+      : latestHealth.cron_ok === false
+        ? 'critical'
+        : latestHealth.blocked_count > 0 || latestHealth.pending_decisions > 0 || latestHealth.is_stale
+          ? 'warning'
+          : 'healthy';
+
+    const summary = {
+      status,
+      blocked_count: latestHealth?.blocked_count ?? 0,
+      pending_decisions: latestHealth?.pending_decisions ?? 0,
+      cron_ok: latestHealth?.cron_ok ?? false,
+      is_stale: latestHealth?.is_stale ?? false,
+      checked_at: latestHealth?.created_at ?? nowIso,
+      last_sync_at: latestHealth?.last_sync_at ?? nowIso,
+    };
 
     const meta = buildMeta({
       source: 'supabase',
@@ -74,8 +92,15 @@ export async function GET() {
       withLegacyListShape({
         key: 'health',
         rows: health,
-        data: health,
+        data: {
+          summary,
+          health,
+        },
         meta,
+        extra: {
+          summary,
+          status,
+        },
       })
     );
   } catch (error) {

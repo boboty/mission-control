@@ -54,14 +54,15 @@ export function PipelineItem({ item, onClick }: { item: PipelineType; onClick: (
   return (
     <ClickableItem
       onClick={onClick}
-      className={`group relative rounded-xl border border-[var(--border-light)] bg-[var(--surface-elevated)]/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-lg ${stageStyle.glow}`}
+      className={`group relative rounded-xl border border-[var(--border-light)] bg-[var(--surface-elevated)]/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-[var(--shadow-md)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${stageStyle.glow}`}
+      aria-label={`流程项目：${item.item_name}，阶段：${item.stage}`}
     >
       <div
         className={`absolute left-0 top-0 h-full w-1.5 rounded-l-xl border-l-4 ${stageStyle.border}`}
         aria-hidden="true"
       />
       <div className="flex items-center justify-between gap-3 pl-2">
-        <span className={`text-sm font-medium truncate flex-1 transition-colors ${stageStyle.title}`}>
+        <span className={`text-sm font-medium truncate flex-1 transition-colors duration-200 group-hover:text-[var(--text-primary)] ${stageStyle.title}`}>
           {item.item_name}
         </span>
         <StatusBadge status={item.stage} size="sm" />

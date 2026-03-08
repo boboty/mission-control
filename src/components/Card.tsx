@@ -21,13 +21,17 @@ export function Card({ children, className = '', hover = true, padding = 'md' }:
   return (
     <div
       className={`
-        bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] rounded-2xl 
+        bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] 
+        rounded-2xl 
         border border-[var(--border-light)] dark:border-[var(--border-medium)] 
         shadow-[var(--shadow-sm)] dark:shadow-[var(--shadow-md)]
-        ${hover ? 'hover:shadow-[var(--shadow-md)] dark:hover:shadow-[var(--shadow-lg)] hover:border-[var(--border-medium)] dark:hover:border-[var(--border-dark)] transition-all duration-200' : ''}
+        ${hover 
+          ? 'hover:shadow-[var(--shadow-lg)] dark:hover:shadow-[var(--shadow-xl)] hover:border-[var(--border-medium)] dark:hover:border-[var(--border-dark)] hover:-translate-y-0.5 transition-all duration-200 ease-out' 
+          : ''}
         ${paddingClasses[padding]}
         ${className}
       `}
+      role={hover ? 'article' : undefined}
     >
       {children}
     </div>
@@ -53,10 +57,10 @@ export function CardHeader({
   iconSize = 24
 }: CardHeaderProps) {
   return (
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-5">
       <div className="flex items-center space-x-3">
         {icon && (
-          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${iconColor} flex items-center justify-center shadow-sm`}>
+          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${iconColor} flex items-center justify-center shadow-md ring-2 ring-white/20 dark:ring-white/10`}>
             {typeof icon === 'string' ? (
               // 如果是字符串，检查是否是 emoji 或图标名称
               icon.length <= 2 ? (
@@ -72,11 +76,11 @@ export function CardHeader({
           </div>
         )}
         <div>
-          <h2 className="text-lg font-semibold dark:text-white">{title}</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)] dark:text-[var(--text-primary)] tracking-tight">{title}</h2>
           {subtitle && <p className="text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] text-sm mt-0.5">{subtitle}</p>}
         </div>
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="flex items-center">{action}</div>}
     </div>
   );
 }
@@ -171,38 +175,50 @@ export function EmptyState({
   const displaySuggestions = suggestions || defaultSuggestions;
   
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      <div className="mb-4">
+    <div 
+      className="flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="mb-4 transition-transform duration-300 hover:scale-110">
         {typeof icon === 'string' && icon.length <= 2 ? (
           // emoji
-          <span className="text-5xl">{icon}</span>
+          <span className="text-5xl block animate-bounce-soft">{icon}</span>
         ) : (
           // 使用 Icon 组件
           <Icon 
             name={typeof icon === 'string' ? icon : 'empty-inbox'} 
             size={iconSize} 
             color="var(--text-muted)"
+            className="opacity-60"
           />
         )}
       </div>
       <h3 className="text-lg font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)] mb-2">{title}</h3>
       {description && (
-        <p className="text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] text-sm mb-4 max-w-sm">
+        <p className="text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] text-sm mb-4 max-w-sm leading-relaxed">
           {description}
         </p>
       )}
-      {action && <div className="mb-4">{action}</div>}
+      {action && (
+        <div className="mb-4 animate-scale-in">
+          {action}
+        </div>
+      )}
       
       {/* 建议操作列表 */}
       {displaySuggestions && displaySuggestions.length > 0 && (
-        <div className="bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-xl p-4 max-w-sm w-full text-left">
-          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
-            💡 建议操作
+        <div className="bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-xl p-4 max-w-sm w-full text-left animate-slide-in-right border border-[var(--border-light)] dark:border-[var(--border-medium)]">
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2 flex items-center">
+            <span className="mr-1.5">💡</span> 建议操作
           </p>
           <ul className="space-y-1.5">
             {displaySuggestions.map((suggestion, index) => (
-              <li key={index} className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] flex items-start">
-                <span className="text-[var(--color-primary)] mr-2 mt-0.5">·</span>
+              <li 
+                key={index} 
+                className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] flex items-start transition-colors duration-200 hover:text-[var(--text-primary)]"
+              >
+                <span className="text-[var(--color-primary)] mr-2 mt-0.5 font-semibold">·</span>
                 {suggestion}
               </li>
             ))}

@@ -97,11 +97,14 @@ export function Icon({
     return <span className={className} style={{ width: size, height: size, display: 'inline-flex' }} />;
   }
   
+  // 加载图标自动添加旋转动画
+  const isSpinner = name === 'loading' || name === 'refresh';
+  
   return (
     <IconComponent 
       size={size} 
       color={color} 
-      className={className}
+      className={`${className} ${isSpinner ? 'animate-spin' : ''}`}
       strokeWidth={2}
     />
   );

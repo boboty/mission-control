@@ -26,10 +26,19 @@ export function SortableTaskItem({ task, onClick }: { task: Task; onClick: () =>
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className={`group mb-2 cursor-grab rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:cursor-grabbing ${isDragging ? 'opacity-60 shadow-lg' : ''}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`任务：${task.title}`}
+      className={`group mb-2 cursor-grab rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:cursor-grabbing active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${isDragging ? 'opacity-60 shadow-lg rotate-2' : ''}`}
     >
       <div className="text-xs font-medium text-[var(--text-primary)] line-clamp-2">{task.title}</div>
-      {task.priority === 'high' && <span className="mt-1.5 inline-block rounded-md bg-[var(--badge-warning-bg)] px-1.5 py-0.5 text-[10px] text-[var(--badge-warning-text)]">高优</span>}
+      {task.priority === 'high' && <span className="mt-1.5 inline-block rounded-md bg-[var(--badge-warning-bg)] px-1.5 py-0.5 text-[10px] text-[var(--badge-warning-text)] font-medium animate-pulse-soft">高优</span>}
     </div>
   );
 }
@@ -38,14 +47,14 @@ export function TaskItem({ task, onClick }: { task: Task; onClick: () => void })
   const isBlocked = task.blocker || task.status === 'blocked';
   return (
     <ClickableItem onClick={onClick} isBlocked={isBlocked} className="-mx-2 px-2 rounded-lg">
-      <div className={`flex items-start justify-between py-2.5 border-b border-[var(--border-light)] last:border-0 ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-1' : ''}`}>
+      <div className={`flex items-start justify-between py-2.5 border-b border-[var(--border-light)] last:border-0 transition-all duration-200 ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-1' : ''}`}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2">
             <span className={`text-sm truncate ${isBlocked || task.priority === 'high' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{task.title}</span>
-            {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full">🚫 阻塞</span>}
+            {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium animate-pulse-soft">🚫 阻塞</span>}
           </div>
           {task.next_action && <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>}
-          {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5">📅 截止：{formatDate(task.due_at)}</p>}
+          {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center"><span className="mr-1">📅</span> 截止：{formatDate(task.due_at)}</p>}
         </div>
         <StatusBadge status={task.status} size="sm" />
       </div>
@@ -56,11 +65,25 @@ export function TaskItem({ task, onClick }: { task: Task; onClick: () => void })
 export function Pagination({ pagination, onPageChange }: { pagination: PaginationInfo; onPageChange: (page: number) => void }) {
   if (pagination.totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-light)]">
-      <span className="text-xs text-[var(--text-muted)]">第 {pagination.page} / {pagination.totalPages} 页</span>
+    <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-light)]" role="navigation" aria-label="分页导航">
+      <span className="text-xs text-[var(--text-muted)]" aria-live="polite">第 {pagination.page} / {pagination.totalPages} 页</span>
       <div className="flex items-center space-x-2">
-        <button onClick={() => onPageChange(pagination.page - 1)} disabled={pagination.page <= 1} className="px-3 py-1.5 text-xs rounded-md border border-[var(--border-light)] disabled:opacity-50">上一页</button>
-        <button onClick={() => onPageChange(pagination.page + 1)} disabled={!pagination.hasMore} className="px-3 py-1.5 text-xs rounded-md border border-[var(--border-light)] disabled:opacity-50">下一页</button>
+        <button 
+          onClick={() => onPageChange(pagination.page - 1)} 
+          disabled={pagination.page <= 1} 
+          className="px-3 py-1.5 text-xs rounded-md border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-all duration-200 hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
+          aria-label="上一页"
+        >
+          上一页
+        </button>
+        <button 
+          onClick={() => onPageChange(pagination.page + 1)} 
+          disabled={!pagination.hasMore} 
+          className="px-3 py-1.5 text-xs rounded-md border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-all duration-200 hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
+          aria-label="下一页"
+        >
+          下一页
+        </button>
       </div>
     </div>
   );

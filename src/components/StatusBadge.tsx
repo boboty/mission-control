@@ -103,21 +103,23 @@ const statusColorMap: Record<string, { solid: string; soft: string }> = {
 };
 
 const sizeClasses = {
-  sm: 'text-xs px-2 py-0.5',
-  md: 'text-sm px-2.5 py-1',
-  lg: 'text-base px-3 py-1.5',
+  sm: 'text-xs px-2.5 py-1',
+  md: 'text-sm px-3 py-1.5',
+  lg: 'text-base px-4 py-2',
 };
 
-export function StatusBadge({ status, size = 'sm', variant = 'soft' }: StatusBadgeProps) {
-  const displayText = statusTextMap[status] || status;
+export function StatusBadge({ status, size = 'sm', variant = 'soft', label }: StatusBadgeProps) {
+  const displayText = label || statusTextMap[status] || status;
   const colors = statusColorMap[status] || statusColorMap.todo;
   const colorClass = variant === 'solid' ? colors.solid : colors.soft;
   const sizeClass = sizeClasses[size];
 
   return (
     <span
-      className={`inline-flex items-center font-medium rounded-full ${sizeClass} ${colorClass}`}
+      className={`inline-flex items-center font-semibold rounded-full ${sizeClass} ${colorClass} transition-all duration-200 ease-out hover:scale-105 active:scale-95 cursor-default select-none`}
       style={{ whiteSpace: 'nowrap' }}
+      role="status"
+      aria-label={`状态：${displayText}`}
     >
       {displayText}
     </span>

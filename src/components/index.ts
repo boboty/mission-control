@@ -6,3 +6,4 @@ export { DetailModal, ClickableItem, type DetailData } from './DetailModal';
 export { LeftNav } from './LeftNav';
 export { DecisionCenter } from './DecisionCenter';
 export { AlertCard, aggregateAlerts, type Alert } from './AlertCard';
+export { OpsCard } from './OpsCard';
