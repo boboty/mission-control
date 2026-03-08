@@ -5,6 +5,7 @@ import { DndContext, DragOverlay, closestCenter, type DragEndEvent } from '@dnd-
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ClickableItem, EmptyState, type Alert, type DetailData } from '@/components';
 import { CalendarCard } from '@/components/dashboard/CalendarCard';
+import { PipelineCard } from '@/components/dashboard/PipelineCard';
 import { TaskItem, SortableTaskItem, Pagination } from '@/components/dashboard/TaskBoard';
 import { PipelineItem } from '@/components/dashboard/Pipeline';
 import { TeamOverview } from '@/components/dashboard/TeamOverview';
@@ -214,6 +215,10 @@ export function ModuleContent({
     case 'pipelines':
       if (pipelines.length === 0) {
         return <EmptyState moduleType="pipelines" icon="empty-pipeline" title="暂无流程" description="当前没有进行中的流程项目" action={<button className="btn btn-primary">新建流程</button>} />;
+      }
+
+      if (!isSingleModule) {
+        return <PipelineCard pipelines={pipelines} openDetail={onOpenDetail} />;
       }
 
       return (
