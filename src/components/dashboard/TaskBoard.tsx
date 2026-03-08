@@ -1,12 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { DndContext, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ClickableItem, EmptyState, Icon, StatusBadge, type DetailData } from '@/components';
 import { type Task, type PaginationInfo, KANBAN_COLUMNS, STATUS_OPTIONS, STATUS_GROUP_NAMES } from '@/lib/types';
 import { groupTasksByStatus, taskToDetail, formatDate } from '@/lib/data-utils';
+
+// Virtual scroll threshold
+const VIRTUAL_SCROLL_THRESHOLD = 100;
+// Estimated row height for virtual scroll (in pixels)
+const ROW_HEIGHT = 64;
+// Buffer size for virtual scroll (number of items to render beyond visible area)
+const VIRTUAL_BUFFER = 5;
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -158,6 +166,26 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
+  
+  // Virtual scroll refs and data preparation
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  // Prepare data for virtual scroll - flatten grouped data if needed
+  const flattenedTasks = taskViewMode === 'grouped' 
+    ? Object.entries(groupTasksByStatus(tasks)).flatMap(([status, list]) => 
+        [{ type: 'header' as const, status, count: list.length }, ...list.map(t => ({ type: 'task' as const, task: t }))]
+      )
+    : tasks.map(t => ({ type: 'task' as const, task: t }));
+  
+  const virtualizer = useVirtualizer({
+    count: flattenedTasks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => {
+      const item = flattenedTasks[index];
+      return item?.type === 'header' ? 32 : ROW_HEIGHT;
+    },
+    overscan: VIRTUAL_BUFFER,
+  });
   
   // Bulk operation state
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
@@ -416,10 +444,74 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
           </DragOverlay>
         </DndContext>
       ) : (
-        <div className="overflow-y-auto -mx-2">
-          {(taskViewMode === 'grouped' ? Object.entries(groupTasksByStatus(tasks)).flatMap(([status, list]) => [<h4 key={status} className="text-xs font-semibold px-2 py-2 text-[var(--text-muted)]">{(STATUS_GROUP_NAMES as Record<string, string>)[status] || status} · {list.length}</h4>, ...list.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} selected={selectedTaskIds.has(task.id)} onToggleSelect={toggleTaskSelection} />)]) : tasks.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} selected={selectedTaskIds.has(task.id)} onToggleSelect={toggleTaskSelection} />))}
-          {taskPagination && <Pagination pagination={taskPagination} onPageChange={fetchTasks} />}
-        </div>
+        <>
+          {/* Virtual scroll for large lists (>100 tasks) */}
+          {tasks.length > VIRTUAL_SCROLL_THRESHOLD ? (
+            <div 
+              ref={parentRef} 
+              className="overflow-y-auto -mx-2" 
+              style={{ height: '600px', maxHeight: '70vh' }}
+            >
+              <div 
+                style={{ 
+                  height: `${virtualizer.getTotalSize()}px`, 
+                  width: '100%', 
+                  position: 'relative' 
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const item = flattenedTasks[virtualRow.index];
+                  if (!item) return null;
+                  
+                  if (item.type === 'header') {
+                    return (
+                      <div
+                        key={`header-${item.status}`}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <h4 className="text-xs font-semibold px-2 py-2 text-[var(--text-muted)]">
+                          {(STATUS_GROUP_NAMES as Record<string, string>)[item.status] || item.status} · {item.count}
+                        </h4>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div
+                      key={item.task.id}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <TaskItem 
+                        task={item.task} 
+                        onClick={() => openDetail(taskToDetail(item.task))}
+                        selected={selectedTaskIds.has(item.task.id)}
+                        onToggleSelect={toggleTaskSelection}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Regular rendering for small lists (<=100 tasks) */
+            <div className="overflow-y-auto -mx-2">
+              {(taskViewMode === 'grouped' ? Object.entries(groupTasksByStatus(tasks)).flatMap(([status, list]) => [<h4 key={status} className="text-xs font-semibold px-2 py-2 text-[var(--text-muted)]">{(STATUS_GROUP_NAMES as Record<string, string>)[status] || status} · {list.length}</h4>, ...list.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} selected={selectedTaskIds.has(task.id)} onToggleSelect={toggleTaskSelection} />)]) : tasks.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} selected={selectedTaskIds.has(task.id)} onToggleSelect={toggleTaskSelection} />))}
+              {taskPagination && <Pagination pagination={taskPagination} onPageChange={fetchTasks} />}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
