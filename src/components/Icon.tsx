@@ -107,7 +107,7 @@ export function Icon({
   }
   
   // 加载图标自动添加旋转动画
-  const isSpinner = name === 'loading' || name === 'refresh';
+  const isSpinner = name === 'loading';
   
   return (
     <IconComponent 
