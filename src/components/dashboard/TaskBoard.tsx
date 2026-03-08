@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ClickableItem, EmptyState, Icon, StatusBadge, type DetailData } from '@/components';
 import { type Task, type PaginationInfo, KANBAN_COLUMNS, STATUS_OPTIONS, STATUS_GROUP_NAMES } from '@/lib/types';
 import { groupTasksByStatus, taskToDetail, formatDate } from '@/lib/data-utils';
+import { exportTasksToCSV, exportTasksToPDF } from '@/lib/export-utils';
 
 // Virtual scroll threshold
 const VIRTUAL_SCROLL_THRESHOLD = 100;
@@ -196,6 +197,10 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
   const [bulkPriority, setBulkPriority] = useState('');
   const [bulkOwner, setBulkOwner] = useState('');
   
+  // Export state
+  const [exportLoading, setExportLoading] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchTasks = async (page = 1) => {
@@ -286,9 +291,71 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
     }
   };
 
+  // Export handlers
+  const handleExportCSV = async () => {
+    setExportLoading(true);
+    try {
+      // Fetch all tasks with current filters
+      const params = new URLSearchParams({ page: '1', pageSize: '1000', sortBy: taskSortBy });
+      if (taskStatusFilter) params.append('status', taskStatusFilter);
+      if (taskSearch) params.append('search', taskSearch);
+      
+      const res = await fetch(`/api/tasks?${params.toString()}`);
+      const data = await res.json();
+      
+      if (data.tasks) {
+        exportTasksToCSV(data.tasks);
+      }
+    } catch (error) {
+      console.error('Export CSV error:', error);
+      alert('导出失败，请重试');
+    } finally {
+      setExportLoading(false);
+      setShowExportMenu(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExportLoading(true);
+    try {
+      // Fetch all tasks with current filters
+      const params = new URLSearchParams({ page: '1', pageSize: '1000', sortBy: taskSortBy });
+      if (taskStatusFilter) params.append('status', taskStatusFilter);
+      if (taskSearch) params.append('search', taskSearch);
+      
+      const res = await fetch(`/api/tasks?${params.toString()}`);
+      const data = await res.json();
+      
+      if (data.tasks) {
+        exportTasksToPDF(data.tasks);
+      }
+    } catch (error) {
+      console.error('Export PDF error:', error);
+      alert('导出失败，请重试');
+    } finally {
+      setExportLoading(false);
+      setShowExportMenu(false);
+    }
+  };
+
   useEffect(() => {
     if (!loading) fetchTasks(1);
   }, [taskSortBy, taskStatusFilter, taskSearch]);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-export-container]')) {
+        setShowExportMenu(false);
+      }
+    };
+
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showExportMenu]);
 
   const handleDragEnd = async ({ active, over }: DragEndEvent) => {
     setActiveId(null);
@@ -403,6 +470,47 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
               <option value="dueDate">截止</option>
               <option value="status">状态</option>
             </select>
+            {/* Export button with dropdown */}
+            <div className="relative" data-export-container>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowExportMenu(!showExportMenu);
+                }}
+                disabled={exportLoading || tasks.length === 0}
+                className="px-3 py-2.5 text-sm border rounded-lg min-h-[44px] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                aria-label="导出任务"
+              >
+                {exportLoading ? (
+                  <span className="animate-spin">⏳</span>
+                ) : (
+                  <Icon name="download" size={16} />
+                )}
+                <span className="hide-mobile">导出</span>
+              </button>
+              
+              {/* Export dropdown menu */}
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 w-40 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] shadow-lg z-50 overflow-hidden" data-export-container>
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={exportLoading}
+                    className="w-full px-4 py-2.5 text-sm text-left hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                  >
+                    <span className="text-base">📊</span>
+                    导出 CSV
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={exportLoading}
+                    className="w-full px-4 py-2.5 text-sm text-left hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2 border-t border-[var(--border-light)]"
+                  >
+                    <span className="text-base">📄</span>
+                    导出 PDF
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center justify-between">
