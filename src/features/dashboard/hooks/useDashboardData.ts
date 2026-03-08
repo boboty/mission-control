@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { aggregateAlerts, type Alert } from '@/components';
+import { getMonthRange } from '@/lib/calendar-utils';
 import { validateData } from '@/lib/data-validation';
 import { groupTasksByStatus } from '@/lib/data-utils';
 import { KANBAN_COLUMNS, type Agent, type Decision, type DecisionSummary, type Event, type Health, type MemoryTopic, type PaginationInfo, type Pipeline, type Task } from '@/lib/types';
@@ -44,7 +45,6 @@ export function useDashboardData() {
   const [taskPage, setTaskPage] = useState(1);
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
-  const [eventPage, setEventPage] = useState(1);
   const [eventPagination, setEventPagination] = useState<PaginationInfo | null>(null);
   const [eventLoading, setEventLoading] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -122,9 +122,10 @@ export function useDashboardData() {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        pageSize: '20',
-        view: 'upcoming',
+        pageSize: '500',
+        view: 'all',
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        ...getMonthRange(new Date()),
       });
 
       const res = await fetch(`/api/events?${params.toString()}`);
@@ -133,7 +134,6 @@ export function useDashboardData() {
       if (data.events) {
         setEvents(data.events);
         setEventPagination(data.pagination);
-        setEventPage(page);
       }
     } catch (fetchError) {
       console.error('Failed to fetch events:', fetchError);
@@ -150,9 +150,10 @@ export function useDashboardData() {
     try {
       const eventsInitParams = new URLSearchParams({
         page: '1',
-        pageSize: '20',
-        view: 'upcoming',
+        pageSize: '500',
+        view: 'all',
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        ...getMonthRange(new Date()),
       });
 
       const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
@@ -192,7 +193,6 @@ export function useDashboardData() {
       if (eventsData.events) {
         setEvents(eventsData.events);
         setEventPagination(eventsData.pagination);
-        setEventPage(eventsData.pagination?.page || 1);
       }
 
       if (agentsData.agents) {
@@ -377,7 +377,6 @@ export function useDashboardData() {
     pipelines,
     setPipelines,
     events,
-    setEvents,
     agents,
     health,
     decisions,
@@ -397,7 +396,6 @@ export function useDashboardData() {
     taskPage,
     taskPagination,
     taskLoading,
-    eventPage,
     eventPagination,
     eventLoading,
     metrics: metricsState.metrics,

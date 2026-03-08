@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { DndContext, DragOverlay, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ClickableItem, EmptyState, type Alert, type DetailData } from '@/components';
+import { CalendarCard } from '@/components/dashboard/CalendarCard';
 import { TaskItem, SortableTaskItem, Pagination } from '@/components/dashboard/TaskBoard';
 import { PipelineItem } from '@/components/dashboard/Pipeline';
 import { TeamOverview } from '@/components/dashboard/TeamOverview';
@@ -250,12 +251,16 @@ export function ModuleContent({
         );
       }
 
+      if (!isSingleModule) {
+        return <CalendarCard events={events} openDetail={onOpenDetail} />;
+      }
+
       return (
-        <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
-          {(isSingleModule ? events : events.slice(0, 5)).map((event) => (
+        <div className="overflow-y-auto -mx-2">
+          {events.map((event) => (
             <EventListItem key={event.id} event={event} onClick={() => onOpenDetail(eventToDetail(event))} />
           ))}
-          {isSingleModule && eventPagination && <Pagination pagination={eventPagination} onPageChange={onEventPageChange} />}
+          {eventPagination && <Pagination pagination={eventPagination} onPageChange={onEventPageChange} />}
         </div>
       );
 

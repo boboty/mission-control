@@ -20,9 +20,7 @@ export function SingleModuleView({
   pipelines,
   setPipelines,
   events,
-  setEvents,
   eventLoading,
-  eventPage,
   eventPagination,
   loading,
   openDetail,
@@ -38,9 +36,7 @@ export function SingleModuleView({
   pipelines: Pipeline[];
   setPipelines: React.Dispatch<React.SetStateAction<Pipeline[]>>;
   events: Event[];
-  setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
   eventLoading: boolean;
-  eventPage: number;
   eventPagination: PaginationInfo | null;
   loading: boolean;
   openDetail: (data: DetailData) => void | Promise<void>;
@@ -95,9 +91,9 @@ export function SingleModuleView({
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">日历列表</h2>
-                {eventPagination && <span className="text-xs text-[var(--text-muted)]">第 {eventPage} 页 · 共 {eventPagination.total} 项</span>}
+                {eventPagination && <span className="text-xs text-[var(--text-muted)]">当前缓存 {eventPagination.total} 项</span>}
               </div>
-              <CalendarList events={events} setEvents={setEvents} loading={eventLoading} openDetail={openDetail} />
+              <CalendarList initialEvents={events} loading={eventLoading} openDetail={openDetail} />
             </>
           ) : (
             <>

@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { EmptyState, Icon, ClickableItem, type DetailData } from '@/components';
-import type { Event as EventType, PaginationInfo } from '@/lib/types';
-import { eventToDetail, formatDate } from '@/lib/data-utils';
+import { useEffect, useMemo, useState } from 'react';
+import { ClickableItem, EmptyState, Icon, type DetailData } from '@/components';
+import type { Event as EventType } from '@/lib/types';
+import { eventToDetail } from '@/lib/data-utils';
+import { formatAgendaDate, formatEventTimeRange, getMonthRange, groupEventsByDate } from '@/lib/calendar-utils';
+import { CalendarMonth, getDefaultSelectedDate } from './CalendarMonth';
 
 interface CalendarListProps {
-  events: EventType[];
-  setEvents: React.Dispatch<React.SetStateAction<EventType[]>>;
+  initialEvents?: EventType[];
   loading: boolean;
   openDetail: (data: DetailData) => void;
   onRefresh?: () => void;
@@ -22,112 +23,65 @@ const EVENT_TYPE_OPTIONS = [
 ];
 
 const EVENT_VIEW_OPTIONS = [
-  { value: 'upcoming', label: '近期日程' },
-  { value: 'all', label: '全部日程' },
+  { value: 'day', label: '当天安排' },
+  { value: 'all', label: '本月全部' },
 ];
 
-export function CalendarListItem({ event, onClick }: { event: EventType; onClick: () => void }) {
-  const startDate = new Date(event.starts_at);
-  const endDate = event.ends_at ? new Date(event.ends_at) : null;
-  
-  const timeStr = endDate
-    ? `${startDate.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
-    : startDate.toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-  const typeColorMap: Record<string, string> = {
-    meeting: 'bg-blue-500',
-    deadline: 'bg-rose-500',
-    review: 'bg-violet-500',
-    other: 'bg-slate-500',
-  };
-
-  const typeColor = typeColorMap[event.type?.toLowerCase()] || typeColorMap.other;
-
+function DayAgendaItem({ event, onClick }: { event: EventType; onClick: () => void }) {
   return (
     <ClickableItem
       onClick={onClick}
-      className="group mb-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md"
+      className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--color-primary)]/35 hover:shadow-sm"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${typeColor}`} />
-            <p className="text-sm font-medium text-[var(--text-primary)] truncate">{event.title}</p>
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
-            <span className="flex items-center">
-              <Icon name="calendar" size={12} className="mr-1" />
-              {timeStr}
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-[var(--text-primary)] truncate">{event.title}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span className="inline-flex items-center gap-1">
+            <Icon name="calendar" size={12} />
+            {formatEventTimeRange(event)}
+          </span>
+          {event.type && (
+            <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 font-medium">
+              {EVENT_TYPE_OPTIONS.find((item) => item.value === event.type)?.label || event.type}
             </span>
-            {event.type && (
-              <span className="px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[10px] font-medium">
-                {event.type}
-              </span>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </ClickableItem>
   );
 }
 
-export function Pagination({ pagination, onPageChange }: { pagination: PaginationInfo; onPageChange: (page: number) => void }) {
-  if (!pagination || pagination.totalPages <= 1) return null;
-  return (
-    <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-light)]" role="navigation" aria-label="分页导航">
-      <span className="text-xs text-[var(--text-muted)]" aria-live="polite">
-        第 {pagination.page} / {pagination.totalPages} 页 · 共 {pagination.total} 项
-      </span>
-      <div className="flex items-center space-x-2">
-        <button 
-          onClick={() => onPageChange(pagination.page - 1)} 
-          disabled={pagination.page <= 1} 
-          className="px-3 py-1.5 text-xs rounded-md border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-all duration-200 hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
-          aria-label="上一页"
-        >
-          上一页
-        </button>
-        <button 
-          onClick={() => onPageChange(pagination.page + 1)} 
-          disabled={!pagination.hasMore} 
-          className="px-3 py-1.5 text-xs rounded-md border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-all duration-200 hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
-          aria-label="下一页"
-        >
-          下一页
-        </button>
-      </div>
-    </div>
-  );
+function addMonths(date: Date, delta: number) {
+  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
 }
 
-export function CalendarList({ events, setEvents, loading, openDetail }: CalendarListProps) {
+export function CalendarList({ initialEvents = [], loading, openDetail }: CalendarListProps) {
+  const [events, setEvents] = useState<EventType[]>(initialEvents);
   const [eventSearch, setEventSearch] = useState('');
   const [eventTypeFilter, setEventTypeFilter] = useState('');
-  const [eventFrom, setEventFrom] = useState('');
-  const [eventTo, setEventTo] = useState('');
-  const [eventView, setEventView] = useState<'upcoming' | 'all'>('upcoming');
-  const [eventPagination, setEventPagination] = useState<PaginationInfo | null>(null);
+  const [eventView, setEventView] = useState<'day' | 'all'>('day');
+  const [viewDate, setViewDate] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [eventLoading, setEventLoading] = useState(false);
+  const [selectedDateKey, setSelectedDateKey] = useState(() => getDefaultSelectedDate(new Date()));
 
-  const fetchEvents = async (page = 1) => {
+  const fetchEvents = async () => {
     setEventLoading(true);
     try {
       const params = new URLSearchParams({
-        page: String(page),
-        pageSize: '20',
-        view: eventView,
+        page: '1',
+        pageSize: '500',
+        view: 'all',
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        ...getMonthRange(viewDate),
       });
       if (eventTypeFilter) params.append('type', eventTypeFilter);
       if (eventSearch) params.append('search', eventSearch);
-      if (eventFrom) params.append('from', eventFrom);
-      if (eventTo) params.append('to', eventTo);
 
       const res = await fetch(`/api/events?${params.toString()}`);
       const data = await res.json();
+
       if (data.events) {
         setEvents(data.events);
-        setEventPagination(data.pagination);
       }
     } finally {
       setEventLoading(false);
@@ -135,8 +89,10 @@ export function CalendarList({ events, setEvents, loading, openDetail }: Calenda
   };
 
   useEffect(() => {
-    if (!loading) fetchEvents(1);
-  }, [eventView, eventTypeFilter, eventSearch, eventFrom, eventTo]);
+    if (!loading) {
+      void fetchEvents();
+    }
+  }, [viewDate, eventTypeFilter, eventSearch, loading]);
 
   const createEvent = async (eventData: { title: string; starts_at: string; ends_at?: string; type?: string }) => {
     try {
@@ -147,7 +103,7 @@ export function CalendarList({ events, setEvents, loading, openDetail }: Calenda
       });
       if (res.ok) {
         alert('日程创建成功！');
-        fetchEvents(1);
+        await fetchEvents();
       } else {
         const error = await res.json();
         alert(`创建失败：${error.error || '未知错误'}`);
@@ -160,26 +116,30 @@ export function CalendarList({ events, setEvents, loading, openDetail }: Calenda
   const handleResetFilters = () => {
     setEventSearch('');
     setEventTypeFilter('');
-    setEventFrom('');
-    setEventTo('');
-    setEventView('upcoming');
+    setEventView('day');
+    const today = new Date();
+    setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelectedDateKey(getDefaultSelectedDate(today));
   };
+
+  const selectedDayEvents = useMemo(() => groupEventsByDate(events)[selectedDateKey] || [], [events, selectedDateKey]);
+  const agendaEvents = eventView === 'all' ? events : selectedDayEvents;
 
   if (events.length === 0 && !eventLoading && !loading) {
     return (
-      <EmptyState 
-        moduleType="events" 
-        icon="empty-calendar" 
-        title="暂无日程" 
-        description="近期没有安排的日程"
+      <EmptyState
+        moduleType="events"
+        icon="empty-calendar"
+        title="本月暂无日程"
+        description="还没有安排任何日程"
         action={
-          <button 
+          <button
             onClick={() => {
               const title = prompt('请输入日程标题：');
               if (!title) return;
               const starts_at = prompt('开始时间（格式：2026-03-08T14:00）：');
               if (!starts_at) return;
-              createEvent({ title, starts_at });
+              void createEvent({ title, starts_at });
             }}
             className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
           >
@@ -191,79 +151,175 @@ export function CalendarList({ events, setEvents, loading, openDetail }: Calenda
   }
 
   return (
-    <div>
-      <div className="space-y-3 mb-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
-            <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-            <input
-              value={eventSearch}
-              onChange={(e) => setEventSearch(e.target.value)}
-              placeholder="搜索日程（标题或 ID）..."
-              className="w-full pl-10 pr-4 py-2 text-sm border rounded-lg border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
-            />
+    <div className="space-y-5">
+      <div className="rounded-[28px] border border-[var(--border-light)] bg-[linear-gradient(135deg,rgba(16,185,129,0.08),rgba(14,165,233,0.04))] p-5">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">Calendar</div>
+            <h2 className="mt-2 text-2xl font-bold text-[var(--text-primary)]">
+              {viewDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })}
+            </h2>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              农历、节日和日程都直接落在月历格子里，选中日期即可查看安排。
+            </p>
           </div>
-          <select
-            value={eventView}
-            onChange={(e) => setEventView(e.target.value as 'upcoming' | 'all')}
-            className="sm:w-36 px-3 py-2 text-sm border rounded-lg border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
-          >
-            {EVENT_VIEW_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <select
-            value={eventTypeFilter}
-            onChange={(e) => setEventTypeFilter(e.target.value)}
-            className="sm:w-36 px-3 py-2 text-sm border rounded-lg border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
-          >
-            {EVENT_TYPE_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const previous = addMonths(viewDate, -1);
+                setViewDate(previous);
+                setSelectedDateKey(getDefaultSelectedDate(previous));
+              }}
+              className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              上个月
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const today = new Date();
+                setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                setSelectedDateKey(getDefaultSelectedDate(today));
+              }}
+              className="rounded-xl bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              回到本月
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = addMonths(viewDate, 1);
+                setViewDate(next);
+                setSelectedDateKey(getDefaultSelectedDate(next));
+              }}
+              className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              下个月
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const title = prompt('请输入日程标题：');
+                if (!title) return;
+                const starts_at = prompt('开始时间（格式：2026-03-08T14:00）：');
+                if (!starts_at) return;
+                void createEvent({ title, starts_at });
+              }}
+              className="rounded-xl bg-[var(--text-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              新建日程
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="date"
-            value={eventFrom}
-            onChange={(e) => setEventFrom(e.target.value)}
-            className="sm:w-44 px-3 py-2 text-sm rounded-lg border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
-          />
-          <input
-            type="date"
-            value={eventTo}
-            onChange={(e) => setEventTo(e.target.value)}
-            className="sm:w-44 px-3 py-2 text-sm rounded-lg border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
-          />
-          <button
-            onClick={handleResetFilters}
-            className="sm:w-28 px-3 py-2 text-sm rounded-lg border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            重置筛选
-          </button>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-muted)]">
-            {eventPagination ? `共 ${eventPagination.total} 项日程` : ''}
-          </span>
+
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_340px] gap-5">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  value={eventSearch}
+                  onChange={(e) => setEventSearch(e.target.value)}
+                  placeholder="搜索日程标题或 ID"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-xl border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
+                />
+              </div>
+              <select
+                value={eventView}
+                onChange={(e) => setEventView(e.target.value as 'day' | 'all')}
+                className="sm:w-36 px-3 py-2.5 text-sm border rounded-xl border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
+              >
+                {EVENT_VIEW_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <select
+                value={eventTypeFilter}
+                onChange={(e) => setEventTypeFilter(e.target.value)}
+                className="sm:w-36 px-3 py-2.5 text-sm border rounded-xl border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]"
+              >
+                {EVENT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleResetFilters}
+                className="sm:w-28 px-3 py-2.5 text-sm rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                重置
+              </button>
+            </div>
+
+            {(eventLoading || loading) ? (
+              <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-16 text-center text-sm text-[var(--text-muted)]">
+                加载日历中...
+              </div>
+            ) : (
+              <CalendarMonth
+                viewDate={viewDate}
+                events={events}
+                selectedDateKey={selectedDateKey}
+                onSelectDate={setSelectedDateKey}
+                onEventClick={(event) => openDetail(eventToDetail(event))}
+              />
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4 xl:sticky xl:top-6 h-fit">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">Agenda</div>
+                <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+                  {formatAgendaDate(selectedDateKey)}
+                </h3>
+              </div>
+              <div className="rounded-full bg-[var(--bg-tertiary)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                {agendaEvents.length} 项
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {agendaEvents.length > 0 ? (
+                agendaEvents.map((event) => (
+                  <DayAgendaItem key={event.id} event={event} onClick={() => openDetail(eventToDetail(event))} />
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[var(--border-light)] px-4 py-10 text-center text-sm text-[var(--text-muted)]">
+                  当天没有日程安排
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-y-auto -mx-2">
-        {(eventLoading || loading) ? (
-          <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>
-        ) : (
-          <>
-            {events.map((event) => (
-              <CalendarListItem 
-                key={event.id} 
-                event={event} 
-                onClick={() => openDetail(eventToDetail(event))} 
-              />
-            ))}
-            {eventPagination && <Pagination pagination={eventPagination} onPageChange={fetchEvents} />}
-          </>
-        )}
+      <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">本月安排总览</div>
+          <div className="text-xs text-[var(--text-muted)]">共 {events.length} 项日程</div>
+        </div>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-xl bg-[var(--bg-tertiary)] px-4 py-3">
+            <div className="text-[var(--text-muted)]">会议</div>
+            <div className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+              {events.filter((event) => event.type === 'meeting').length}
+            </div>
+          </div>
+          <div className="rounded-xl bg-[var(--bg-tertiary)] px-4 py-3">
+            <div className="text-[var(--text-muted)]">截止</div>
+            <div className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+              {events.filter((event) => event.type === 'deadline').length}
+            </div>
+          </div>
+          <div className="rounded-xl bg-[var(--bg-tertiary)] px-4 py-3">
+            <div className="text-[var(--text-muted)]">评审</div>
+            <div className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+              {events.filter((event) => event.type === 'review').length}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -215,9 +215,7 @@ export default function Dashboard() {
               pipelines={dashboard.pipelines}
               setPipelines={dashboard.setPipelines}
               events={dashboard.events}
-              setEvents={dashboard.setEvents}
               eventLoading={dashboard.eventLoading}
-              eventPage={dashboard.eventPage}
               eventPagination={dashboard.eventPagination}
               loading={dashboard.loading}
               openDetail={openDetail}
