@@ -1,167 +1,123 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPgPool } from '../_lib/pg';
-import { buildMeta, withLegacyListShape } from '../_lib/response';
+import { promises as fs } from 'fs';
+import path from 'path';
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: '全部类别' },
-  { value: 'preference', label: '偏好' },
-  { value: 'fact', label: '事实' },
-  { value: 'decision', label: '决策' },
-  { value: 'entity', label: '实体' },
-  { value: 'other', label: '其他' },
-];
+const MEMORY_TOPICS_DIR = path.join(process.cwd(), '../../.openclaw/workspace/memory/topics');
+
+interface MemoryTopic {
+  id: number;
+  title: string;
+  category: 'topic';
+  ref_path: string;
+  summary: string;
+  happened_at: string;
+  slug: string;
+}
 
 export async function GET(request: NextRequest) {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
-  }
-
-  const pool = getPgPool(databaseUrl);
-
   try {
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
-    const category = searchParams.get('category') || '';
     const search = searchParams.get('search') || '';
-
-    const offset = (page - 1) * pageSize;
-
-    // Build WHERE clause
-    const whereClauses: string[] = [];
-    const params: any[] = [];
-    let paramIndex = 1;
-
-    if (category) {
-      whereClauses.push(`category = $${paramIndex++}`);
-      params.push(category);
+    
+    // 读取本地记忆主题目录
+    const topicsDir = MEMORY_TOPICS_DIR;
+    let files: string[] = [];
+    
+    try {
+      files = await fs.readdir(topicsDir);
+      files = files.filter(f => f.endsWith('.md'));
+    } catch (err) {
+      console.error('Memory topics dir not found:', topicsDir, err);
+      return NextResponse.json({
+        data: { memories: [] },
+        meta: { source: 'local', last_sync_at: new Date().toISOString() },
+        memories: [],
+        count: 0,
+        data_source: 'local',
+      });
     }
-
-    if (search) {
-      whereClauses.push(`(title ILIKE $${paramIndex++} OR summary ILIKE $${paramIndex++})`);
-      params.push(`%${search}%`, `%${search}%`);
+    
+    const memories: MemoryTopic[] = [];
+    
+    for (const file of files) {
+      const slug = file.replace('.md', '');
+      const filePath = path.join(topicsDir, file);
+      
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        const lines = content.split('\n');
+        
+        // 提取标题（第一个非空行或 # 标题）
+        let title = slug;
+        let summary = '';
+        
+        for (const line of lines) {
+          if (line.startsWith('# ')) {
+            title = line.substring(2).trim();
+            break;
+          } else if (line.trim() && !line.startsWith('>') && !line.startsWith('---')) {
+            title = line.trim().substring(0, 50);
+            break;
+          }
+        }
+        
+        // 提取摘要（第一段的非标题内容）
+        const summaryLines: string[] = [];
+        let inContent = false;
+        for (const line of lines) {
+          if (line.startsWith('# ')) {
+            inContent = true;
+            continue;
+          }
+          if (inContent && line.trim() && !line.startsWith('---')) {
+            if (line.startsWith('>')) {
+              summaryLines.push(line.substring(1).trim());
+            } else if (line.startsWith('-') || line.startsWith('*')) {
+              summaryLines.push(line.substring(1).trim());
+            } else {
+              summaryLines.push(line.trim());
+            }
+            if (summaryLines.length >= 2) break;
+          }
+        }
+        summary = summaryLines.join(' | ').substring(0, 200);
+        
+        if (search && !title.toLowerCase().includes(search.toLowerCase()) && !summary.toLowerCase().includes(search.toLowerCase())) {
+          continue;
+        }
+        
+        memories.push({
+          id: memories.length + 1,
+          title,
+          category: 'topic',
+          ref_path: `memory/topics/${file}`,
+          summary,
+          happened_at: new Date().toISOString(),
+          slug,
+        });
+      } catch (err) {
+        console.error(`Error reading ${file}:`, err);
+      }
     }
-
-    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-    // Get total count
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM memories
-      ${whereClause}
-    `;
-    const countResult = await pool.query(countQuery, params);
-    const total = parseInt(countResult.rows[0]?.total || '0', 10);
-    const totalPages = Math.ceil(total / pageSize);
-
-    // Get data
-    const dataQuery = `
-      SELECT id, title, category, ref_path, summary, happened_at
-      FROM memories
-      ${whereClause}
-      ORDER BY happened_at DESC NULLS LAST
-      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
-    `;
-    params.push(pageSize, offset);
-    const result = await pool.query(dataQuery, params);
-
-    const meta = buildMeta({
-      source: 'supabase',
-      lastSyncAt: result.rows[0]?.happened_at || null,
-      dataUpdatedAt: result.rows[0]?.happened_at || null,
-    });
-
-    const pagination = {
-      page,
-      pageSize,
-      total,
-      totalPages,
-      hasMore: page < totalPages,
-    };
-
-    return NextResponse.json(
-      withLegacyListShape({
-        key: 'memories',
-        rows: result.rows,
-        data: result.rows,
-        meta,
-        extra: { pagination, categoryOptions: CATEGORY_OPTIONS },
-      })
-    );
-  } catch (error) {
-    console.error('Failed to fetch memories:', error);
-    return NextResponse.json({ error: 'Failed to fetch memories' }, { status: 500 });
-  } finally {
-    // pool: do not end per-request
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
-  }
-
-  const pool = getPgPool(databaseUrl);
-
-  try {
-    const body = await request.json();
-    const { title, category, ref_path, summary, happened_at } = body;
-
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
-    }
-
-    const result = await pool.query(
-      `
-      INSERT INTO memories (title, category, ref_path, summary, happened_at)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, title, category, ref_path, summary, happened_at
-      `,
-      [title, category || null, ref_path || null, summary || null, happened_at || null]
-    );
-
-    const memory = result.rows[0];
-
+    
+    // 按标题排序
+    memories.sort((a, b) => a.title.localeCompare(b.title));
+    
     return NextResponse.json({
-      success: true,
-      memory,
+      data: { memories },
+      meta: { source: 'local', last_sync_at: new Date().toISOString() },
+      memories,
+      count: memories.length,
+      data_source: 'local',
+      last_sync_at: new Date().toISOString(),
     });
-  } catch (error) {
-    console.error('Failed to create memory:', error);
-    return NextResponse.json({ error: 'Failed to create memory' }, { status: 500 });
-  } finally {
-    // pool: do not end per-request
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
-  }
-
-  const pool = getPgPool(databaseUrl);
-
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json({ error: 'Memory ID is required' }, { status: 400 });
-    }
-
-    await pool.query('DELETE FROM memories WHERE id = $1', [id]);
-
+  } catch (err) {
+    console.error('Failed to fetch memories:', err);
     return NextResponse.json({
-      success: true,
-      message: 'Memory deleted successfully',
-    });
-  } catch (error) {
-    console.error('Failed to delete memory:', error);
-    return NextResponse.json({ error: 'Failed to delete memory' }, { status: 500 });
-  } finally {
-    // pool: do not end per-request
+      error: 'Failed to fetch memories',
+      data: { memories: [] },
+      memories: [],
+      count: 0,
+    }, { status: 500 });
   }
 }
