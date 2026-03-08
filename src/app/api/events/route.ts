@@ -94,12 +94,11 @@ export async function GET(request: Request) {
     const countResult = await pool.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total, 10);
 
-    // Fetch events with linked task IDs (as array)
+    // Fetch events (linked_task_ids temporarily disabled - pending DB migration)
     const dataQuery = `
       SELECT e.id, e.title, e.starts_at, e.ends_at, e.type, e.source,
-             COALESCE(ARRAY_AGG(t.id) FILTER (WHERE t.id IS NOT NULL), ARRAY[]::INTEGER[]) as linked_task_ids
+             ARRAY[]::INTEGER[] as linked_task_ids
       FROM events e
-      LEFT JOIN tasks t ON t.linked_event_id = e.id
       ${whereClause}
       GROUP BY e.id
       ORDER BY starts_at ASC

@@ -61,12 +61,11 @@ export async function GET(request: Request) {
     const total = parseInt(countResult.rows[0].total, 10);
     const now = new Date().toISOString();
 
-    // Fetch pipelines with linked task IDs (as array)
+    // Fetch pipelines (linked_task_ids temporarily disabled - pending DB migration)
     const dataQuery = `
       SELECT p.id, p.item_name, p.stage, p.owner, p.due_at, p.updated_at,
-             COALESCE(ARRAY_AGG(t.id) FILTER (WHERE t.id IS NOT NULL), ARRAY[]::INTEGER[]) as linked_task_ids
+             ARRAY[]::INTEGER[] as linked_task_ids
       FROM pipelines p
-      LEFT JOIN tasks t ON t.linked_pipeline_id = p.id
       ${whereClause}
       GROUP BY p.id
       ORDER BY due_at ASC NULLS LAST, p.id DESC
