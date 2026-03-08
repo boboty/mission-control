@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon';
 import { TaskBoard, TaskItem, SortableTaskItem, Pagination } from '../components/dashboard/TaskBoard';
 import { Pipeline as PipelineComponent, PipelineItem } from '../components/dashboard/Pipeline';
 import { PipelineList } from '../components/dashboard/PipelineList';
+import { CalendarList } from '../components/dashboard/CalendarList';
 import type { Pipeline as PipelineType } from '@/lib/types';
 import { TeamOverview } from '../components/dashboard/TeamOverview';
 import { KANBAN_COLUMNS } from '../lib/types';
@@ -56,6 +57,7 @@ interface Event {
   starts_at: string;
   ends_at: string;
   type: string;
+  source?: string;
 }
 
 interface Agent {
@@ -170,6 +172,11 @@ const statusOptions = [
   { value: 'in_progress', label: '进行中' },
   { value: 'blocked', label: '已阻塞' },
   { value: 'done', label: '已完成' },
+];
+
+const EVENT_VIEW_OPTIONS = [
+  { value: 'upcoming', label: '近期日程' },
+  { value: 'all', label: '全部日程' },
 ];
 
 // ============ 数据转换函数 ============
@@ -320,16 +327,16 @@ function healthToDetail(snapshot: Health): DetailData {
 
 // ============ 子组件 ============
 
-// 系统状态指示器
+// 系统状态指示器 - 优化视觉
 function SystemStatus({ health }: { health: Health[] }) {
   const latest = health[0];
   const isHealthy = latest?.cron_ok && (!latest.blocked_count || latest.blocked_count === 0);
 
   return (
-    <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl ${
+    <div className={`inline-flex items-center space-x-2.5 px-4 py-2.5 rounded-xl ${
       isHealthy ? 'bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]' :
       'bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]'
-    }`}>
+    } shadow-sm border border-[var(--border-light)] dark:border-[var(--border-medium)]`}>
       <span className="relative flex h-2.5 w-2.5">
         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
           isHealthy ? 'bg-[var(--color-success)]' : 'bg-[var(--color-warning)]'
@@ -338,7 +345,7 @@ function SystemStatus({ health }: { health: Health[] }) {
           isHealthy ? 'bg-[var(--color-success)]' : 'bg-[var(--color-warning)]'
         }`} />
       </span>
-      <span className="text-sm font-medium">
+      <span className="text-sm font-semibold">
         {isHealthy ? '系统正常' : '需要关注'}
       </span>
     </div>
@@ -354,8 +361,8 @@ function HealthOverviewCard({ health, lastUpdated, alerts }: { health: Health[];
   const staleLevel = staleHours > 24 ? 'error' : staleHours > 2 ? 'warning' : 'success';
 
   return (
-    <Card hover={false} padding="none">
-      <div className="p-5">
+    <Card hover={false} padding="none" className="overflow-hidden">
+      <div className="p-6">
         <CardHeader
           icon="health"
           iconColor="from-rose-500 to-rose-600"
@@ -363,34 +370,34 @@ function HealthOverviewCard({ health, lastUpdated, alerts }: { health: Health[];
           subtitle={`最近检测：${formatUpdateTime(latest.created_at)}`}
         />
 
-        <div className="border-t border-slate-100 dark:border-slate-700 pt-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3">
-              <div className="text-xs text-[var(--text-muted)]">阻塞任务</div>
-              <div className={`mt-1 text-xl font-semibold ${latest.blocked_count > 0 ? 'text-[var(--badge-error-text)]' : 'text-[var(--text-primary)]'}`}>
+        <div className="border-t border-[var(--border-light)] dark:border-[var(--border-medium)] pt-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] p-4 transition-all duration-200 hover:shadow-md">
+              <div className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">阻塞任务</div>
+              <div className={`mt-2 text-2xl font-bold ${latest.blocked_count > 0 ? 'text-[var(--badge-error-text)]' : 'text-[var(--text-primary)]'}`}>
                 {latest.blocked_count}
               </div>
             </div>
-            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3">
-              <div className="text-xs text-[var(--text-muted)]">待决策</div>
-              <div className={`mt-1 text-xl font-semibold ${latest.pending_decisions > 0 ? 'text-[var(--badge-warning-text)]' : 'text-[var(--text-primary)]'}`}>
+            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] p-4 transition-all duration-200 hover:shadow-md">
+              <div className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">待决策</div>
+              <div className={`mt-2 text-2xl font-bold ${latest.pending_decisions > 0 ? 'text-[var(--badge-warning-text)]' : 'text-[var(--text-primary)]'}`}>
                 {latest.pending_decisions}
               </div>
             </div>
-            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] p-3">
-              <div className="text-xs text-[var(--text-muted)]">Cron 心跳</div>
-              <div className="mt-1">
+            <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] p-4 transition-all duration-200 hover:shadow-md">
+              <div className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Cron 心跳</div>
+              <div className="mt-2">
                 <StatusBadge status={latest.cron_ok ? 'success' : 'error'} size="sm" />
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] p-3 bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)]">
+          <div className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] p-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--text-secondary)]">告警聚合</span>
+              <span className="text-[var(--text-secondary)] font-medium">告警聚合</span>
               <span className="text-[var(--text-muted)]">{alerts.length} 条</span>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <StatusBadge status={latest.blocked_count > 0 ? 'error' : 'success'} size="sm" label={latest.blocked_count > 0 ? '阻塞>2h/阻塞中' : '阻塞正常'} />
               <StatusBadge status={staleLevel === 'error' ? 'error' : staleLevel === 'warning' ? 'warning' : 'success'} size="sm" label={staleLevel === 'error' ? '数据落后>24h' : staleLevel === 'warning' ? '数据落后>2h' : '数据新鲜'} />
               <StatusBadge status={latest.cron_ok ? 'success' : 'error'} size="sm" label={latest.cron_ok ? '心跳正常' : '失败心跳'} />
@@ -534,6 +541,14 @@ export default function Dashboard() {
   const [taskPage, setTaskPage] = useState(1);
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventTypeFilter, setEventTypeFilter] = useState('');
+  const [eventFrom, setEventFrom] = useState('');
+  const [eventTo, setEventTo] = useState('');
+  const [eventView, setEventView] = useState<'upcoming' | 'all'>('upcoming');
+  const [eventPage, setEventPage] = useState(1);
+  const [eventPagination, setEventPagination] = useState<PaginationInfo | null>(null);
+  const [eventLoading, setEventLoading] = useState(false);
   
   // 拖拽状态
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -635,14 +650,49 @@ export default function Dashboard() {
     }
   }, [taskSortBy, taskStatusFilter, taskSearch]);
 
+  const fetchEvents = useCallback(async (page = 1) => {
+    setEventLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: '20',
+        view: eventView,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      });
+      if (eventTypeFilter) params.append('type', eventTypeFilter);
+      if (eventSearch) params.append('search', eventSearch);
+      if (eventFrom) params.append('from', eventFrom);
+      if (eventTo) params.append('to', eventTo);
+
+      const res = await fetch(`/api/events?${params.toString()}`);
+      const data = await res.json();
+      if (data.events) {
+        setEvents(data.events);
+        setEventPagination(data.pagination);
+        setEventPage(page);
+      }
+    } catch (err) {
+      console.error('Failed to fetch events:', err);
+    } finally {
+      setEventLoading(false);
+    }
+  }, [eventFrom, eventSearch, eventTo, eventTypeFilter, eventView]);
+
   // 初始加载所有数据
   useEffect(() => {
     async function fetchData() {
       try {
+        const eventsInitParams = new URLSearchParams({
+          page: '1',
+          pageSize: '20',
+          view: 'upcoming',
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        });
+
         const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
           fetch('/api/tasks?page=1&pageSize=20'),
           fetch('/api/pipelines'),
-          fetch('/api/events'),
+          fetch(`/api/events?${eventsInitParams.toString()}`),
           fetch('/api/agents'),
           fetch('/api/memory-topics'),
           fetch('/api/health'),
@@ -666,7 +716,11 @@ export default function Dashboard() {
           setDataValidation(prev => ({ ...prev, tasks: { valid: validation.valid, warnings: validation.warnings } }));
         }
         if (pipelinesData.pipelines) setPipelines(pipelinesData.pipelines);
-        if (eventsData.events) setEvents(eventsData.events);
+        if (eventsData.events) {
+          setEvents(eventsData.events);
+          setEventPagination(eventsData.pagination);
+          setEventPage(eventsData.pagination?.page || 1);
+        }
         if (agentsData.agents) setAgents(agentsData.agents);
         if (memoryTopicsData?.topics) {
           setMemoryTopics(memoryTopicsData.topics);
@@ -720,6 +774,12 @@ export default function Dashboard() {
     }
   }, [taskStatusFilter, taskSearch, taskSortBy]);
 
+  useEffect(() => {
+    if (!loading && activeModule === 'events') {
+      fetchEvents(1);
+    }
+  }, [loading, activeModule, eventTypeFilter, eventSearch, eventFrom, eventTo, eventView, fetchEvents]);
+
   // Agent 状态轮询（每 10 秒刷新一次）
   useEffect(() => {
     const fetchAgents = async () => {
@@ -742,6 +802,11 @@ export default function Dashboard() {
     setTaskPage(newPage);
   };
 
+  const handleEventPageChange = (newPage: number) => {
+    fetchEvents(newPage);
+    setEventPage(newPage);
+  };
+
   // 指标状态
   const [metricsState, setMetricsState] = useState({
     metrics: { total: 0, inProgress: 0, blocked: 0, pending: 0 },
@@ -759,6 +824,7 @@ export default function Dashboard() {
     setSelectedItem(data);
     setDetailOpen(true);
   };
+  const eventTypeOptions = Array.from(new Set(events.map(e => e.type).filter(Boolean)));
   
   // 渲染模块内容
   const renderModuleContent = (key: string, isSingleModule = false) => {
@@ -869,18 +935,22 @@ export default function Dashboard() {
           </div>
         );
       case 'events':
+        if (eventLoading && events.length === 0) {
+          return <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>;
+        }
         if (events.length === 0) {
           return <EmptyState moduleType="events" icon="empty-calendar" title="暂无日程" description="近期没有安排的日程" action={<button className="btn btn-primary">新建日程</button>} />;
         }
         return (
           <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
-            {events.map(event => (
+            {(isSingleModule ? events : events.slice(0, 5)).map(event => (
               <EventItem 
                 key={event.id} 
                 event={event} 
                 onClick={() => openDetail(eventToDetail(event))}
               />
             ))}
+            {isSingleModule && eventPagination && <Pagination pagination={eventPagination} onPageChange={handleEventPageChange} />}
           </div>
         );
       case 'agents':
@@ -933,15 +1003,7 @@ export default function Dashboard() {
           return <EmptyState moduleType="health" icon="empty-heart" title="暂无数据" description="健康检测数据尚未生成" />;
         }
         return (
-          <div className={`${isSingleModule ? '' : 'max-h-[420px]'} overflow-y-auto -mx-2`}>
-            {health.map(snapshot => (
-              <HealthItem 
-                key={snapshot.id} 
-                snapshot={snapshot} 
-                onClick={() => openDetail(healthToDetail(snapshot))}
-              />
-            ))}
-          </div>
+          <HealthOverviewCard health={health} lastUpdated={lastUpdated} alerts={alerts} />
         );
       default:
         return null;
@@ -960,24 +1022,28 @@ export default function Dashboard() {
       
       {/* 主内容区 */}
       <main className={`transition-all duration-300 ${navCollapsed ? 'ml-16' : 'ml-64'}`}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 max-w-7xl mx-auto">
           
-          {/* 顶部标题区 */}
-          <header className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* 顶部标题区 - 优化布局 */}
+          <header className="mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
               <div>
                 <h1 className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">
                   {activeModule === 'dashboard' ? '任务控制中心' : MODULE_CONFIG.find(m => m.key === activeModule)?.name || '模块'}
                 </h1>
-                <p className="text-[var(--text-secondary)] mt-2 text-sm">
-                  数据源：{dataSource}
+                <p className="text-[var(--text-secondary)] mt-2.5 text-sm flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] font-medium">
+                    数据源：{dataSource}
+                  </span>
                   {lastUpdated && (
-                    <span className="ml-3 text-[var(--text-muted)]">
+                    <span className="text-[var(--text-muted)]">
                       · 最近同步：{formatUpdateTime(lastUpdated)}
                     </span>
                   )}
                   {activeModule !== 'dashboard' && (
-                    <span className="ml-3 text-[var(--text-muted)]">· 单模块视图</span>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-medium text-xs">
+                      单模块视图
+                    </span>
                   )}
                 </p>
               </div>
@@ -985,28 +1051,33 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/* 错误提示 */}
+          {/* 错误提示 - 优化样式 */}
           {error && (
-            <div className="mb-6 p-4 bg-[var(--badge-error-bg)] rounded-xl border border-[var(--border-medium)] flex items-start space-x-3">
-              <Icon name="error" size={24} className="text-[var(--badge-error-text)]" />
-              <div>
-                <p className="text-[var(--badge-error-text)] font-medium text-sm">加载失败</p>
-                <p className="text-[var(--badge-error-text)]/80 text-sm mt-1">{error}</p>
+            <div className="mb-8 p-5 bg-[var(--badge-error-bg)] rounded-2xl border border-[var(--border-medium)] shadow-sm flex items-start space-x-4">
+              <div className="w-10 h-10 rounded-xl bg-[var(--badge-error-bg)] flex items-center justify-center flex-shrink-0">
+                <Icon name="error" size={24} className="text-[var(--badge-error-text)]" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[var(--badge-error-text)] font-semibold text-sm">加载失败</p>
+                <p className="text-[var(--badge-error-text)]/85 text-sm mt-1.5">{error}</p>
               </div>
             </div>
           )}
 
-          {/* 数据质量警告 */}
+          {/* 数据质量警告 - 优化样式 */}
           {Object.entries(dataValidation).some(([_, v]) => v.warnings.length > 0) && (
-            <div className="mb-6 p-4 bg-[var(--badge-warning-bg)] rounded-xl border border-[var(--border-medium)] flex items-start space-x-3">
-              <Icon name="warning" size={24} className="text-[var(--badge-warning-text)]" />
+            <div className="mb-8 p-5 bg-[var(--badge-warning-bg)] rounded-2xl border border-[var(--border-medium)] shadow-sm flex items-start space-x-4">
+              <div className="w-10 h-10 rounded-xl bg-[var(--badge-warning-bg)] flex items-center justify-center flex-shrink-0">
+                <Icon name="warning" size={24} className="text-[var(--badge-warning-text)]" />
+              </div>
               <div className="flex-1">
-                <p className="text-[var(--badge-warning-text)] font-medium text-sm">数据质量提醒</p>
-                <ul className="text-[var(--badge-warning-text)]/80 text-sm mt-1 space-y-0.5">
+                <p className="text-[var(--badge-warning-text)] font-semibold text-sm">数据质量提醒</p>
+                <ul className="text-[var(--badge-warning-text)]/85 text-sm mt-1.5 space-y-1">
                   {Object.entries(dataValidation).flatMap(([module, validation]) =>
                     validation.warnings.map((w, i) => (
-                      <li key={`${module}-${i}`}>
-                        <span className="font-medium capitalize">{module}:</span> {w}
+                      <li key={`${module}-${i}`} className="flex items-start">
+                        <span className="text-[var(--badge-warning-text)] mr-2 mt-0.5">·</span>
+                        <span><span className="font-semibold capitalize">{module}:</span> {w}</span>
                       </li>
                     ))
                   )}
@@ -1069,6 +1140,23 @@ export default function Dashboard() {
                         pipelines={pipelines}
                         setPipelines={setPipelines}
                         loading={loading}
+                        openDetail={openDetail}
+                      />
+                    </>
+                  ) : activeModule === 'events' ? (
+                    <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">日历列表</h2>
+                        {eventPagination && (
+                          <span className="text-xs text-[var(--text-muted)]">
+                            第 {eventPage} 页 · 共 {eventPagination.total} 项
+                          </span>
+                        )}
+                      </div>
+                      <CalendarList
+                        events={events}
+                        setEvents={setEvents}
+                        loading={eventLoading}
                         openDetail={openDetail}
                       />
                     </>
@@ -1137,9 +1225,9 @@ export default function Dashboard() {
                 )}
               </MetricGroup>
 
-              {/* 告警卡片区域 */}
+              {/* 告警卡片区域 - 增加间距 */}
               {!loading && filteredAlerts.length > 0 && (
-                <div className="mb-4">
+                <div className="mb-6">
                   <AlertCard 
                     alerts={filteredAlerts} 
                     compact={true} 
@@ -1148,9 +1236,9 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* 决策中心模块 */}
+              {/* 决策中心模块 - 增加间距 */}
               {!loading && (
-                <div className="mb-6">
+                <div className="mb-8">
                   <DecisionCenter 
                     decisions={decisions} 
                     summary={decisionSummary}
@@ -1191,77 +1279,81 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* 模块卡片网格 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* 模块卡片网格 - 优化间距和视觉 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {loading ? (
                   MODULE_CONFIG.map((_, i) => <SkeletonCard key={i} lines={4} />)
                 ) : (
                   MODULE_CONFIG.map((module) => (
-                    <Card key={module.name} hover padding="none">
-                      <div className="p-5">
-                        {module.key === 'tasks' ? (
-                          <>
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex items-center space-x-3">
-                                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center shadow-sm`}>
-                                  <Icon name={module.icon} size={24} color="white" />
-                                </div>
-                                <div>
-                                  <h2 className="text-lg font-semibold dark:text-[var(--text-primary)]">{module.name}</h2>
-                                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">共 {taskPagination?.total || tasks.length} 项任务</p>
+                    module.key === 'health' ? (
+                      <HealthOverviewCard key={module.name} health={health} lastUpdated={lastUpdated} alerts={alerts} />
+                    ) : (
+                      <Card key={module.name} hover padding="none" className="overflow-hidden">
+                        <div className="p-6">
+                          {module.key === 'tasks' ? (
+                            <>
+                              <div className="flex items-start justify-between mb-5">
+                                <div className="flex items-center space-x-3">
+                                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center shadow-md ring-2 ring-white/20 dark:ring-white/10`}>
+                                    <Icon name={module.icon} size={24} color="white" />
+                                  </div>
+                                  <div>
+                                    <h2 className="text-lg font-bold dark:text-[var(--text-primary)] tracking-tight">{module.name}</h2>
+                                    <p className="text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] text-sm mt-0.5">共 {taskPagination?.total || tasks.length} 项任务</p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="-mt-3">
-                              {renderModuleContent(module.key, false)}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <CardHeader
-                              icon={module.icon}
-                              iconColor={module.color}
-                              title={module.name}
-                              subtitle={
-                                module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
-                                module.key === 'events' ? `共 ${events.length} 项日程` :
-                                module.key === 'memory_topics' ? `共 ${memoryTopics.length} 个主题` :
-                                module.key === 'agents' ? `共 ${agents.length} 个智能体` :
-                                `共 ${health.length} 次检测`
-                              }
-                            />
-                            <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                              {renderModuleContent(module.key, false)}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </Card>
+                              <div className="-mt-3">
+                                {renderModuleContent(module.key, false)}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <CardHeader
+                                icon={module.icon}
+                                iconColor={module.color}
+                                title={module.name}
+                                subtitle={
+                                  module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
+                                  module.key === 'events' ? `共 ${eventPagination?.total ?? events.length} 项日程` :
+                                  module.key === 'memory_topics' ? `共 ${memoryTopics.length} 个主题` :
+                                  module.key === 'agents' ? `共 ${agents.length} 个智能体` :
+                                  `共 ${health.length} 次检测`
+                                }
+                              />
+                              <div className="border-t border-[var(--border-light)] dark:border-[var(--border-medium)] pt-4">
+                                {renderModuleContent(module.key, false)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    )
                   ))
                 )}
               </div>
             </>
           )}
 
-          {/* 底部状态栏 */}
-          <footer className="mt-8">
+          {/* 底部状态栏 - 优化视觉 */}
+          <footer className="mt-12 mb-6">
             <Card hover={false} padding="md">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-lg shadow-lg ring-2 ring-white/20 dark:ring-white/10">
                     M
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Mission Claw</h3>
-                    <p className="text-xs text-[var(--text-muted)]">MVP · 实时任务总览</p>
+                    <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-tight">Mission Claw</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">MVP · 实时任务总览</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4 text-xs text-[var(--text-muted)]">
-                  <span className="flex items-center">
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
                     <span className="w-2 h-2 bg-[var(--color-success)] rounded-full mr-2" />
                     数据源：{dataSource}
                   </span>
-                  <span className="flex items-center">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
                     <span className="w-2 h-2 bg-[var(--color-primary)] rounded-full mr-2" />
                     {lastUpdated ? `最近同步：${formatUpdateTime(lastUpdated)}` : '等待首次同步'}
                   </span>
