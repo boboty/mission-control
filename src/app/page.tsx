@@ -755,6 +755,7 @@ export default function Dashboard() {
       const pipelinesData = await pipelinesRes.json();
       const eventsData = await eventsRes.json();
       const agentsData = await agentsRes.json();
+      const memoriesData = await memoriesRes.json();
       const memoryTopicsData = await memoryTopicsRes.json();
       const healthData = await healthRes.json();
       const metricsData = await metricsRes.json();
@@ -812,8 +813,10 @@ export default function Dashboard() {
       setAlerts(generatedAlerts);
     } catch (err) {
       console.error('Failed to refresh data:', err);
+      setError('数据加载失败，请刷新页面重试');
     } finally {
-      if (showLoading) setIsRefreshing(false);
+      setIsRefreshing(false);
+      if (loading) setLoading(false);
     }
   }, []);
 
