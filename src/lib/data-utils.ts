@@ -1,4 +1,5 @@
-import { type Task, type Pipeline, type Event, type Agent, type Health, type DetailData } from './types';
+import { type Task, type Pipeline, type Event, type Agent, type Health } from './types';
+import { type DetailData } from '../components/DetailModal';
 
 // ============ 格式化函数 ============
 
@@ -79,6 +80,24 @@ export function taskToDetail(task: Task): DetailData {
       link: `/tasks/999`,
     });
   }
+  // Add linked pipeline
+  if (task.linked_pipeline_id) {
+    relatedObjects.push({
+      id: task.linked_pipeline_id,
+      type: 'pipeline' as const,
+      title: `管线 #${task.linked_pipeline_id}`,
+      link: `/pipelines/${task.linked_pipeline_id}`,
+    });
+  }
+  // Add linked event
+  if (task.linked_event_id) {
+    relatedObjects.push({
+      id: task.linked_event_id,
+      type: 'event' as const,
+      title: `日程 #${task.linked_event_id}`,
+      link: `/events/${task.linked_event_id}`,
+    });
+  }
   
   return {
     id: task.id,
@@ -93,6 +112,8 @@ export function taskToDetail(task: Task): DetailData {
     updatedAt: task.updated_at,
     extra: {
       blocker: task.blocker,
+      linked_pipeline_id: task.linked_pipeline_id,
+      linked_event_id: task.linked_event_id,
     },
     metadata: {
       createdUser: task.owner || '系统',
@@ -108,6 +129,19 @@ export function taskToDetail(task: Task): DetailData {
  * 管线转换为详情数据
  */
 export function pipelineToDetail(item: Pipeline): DetailData {
+  const relatedObjects: any[] = [];
+  // Add linked tasks if available
+  if (item.linked_task_ids && item.linked_task_ids.length > 0) {
+    item.linked_task_ids.forEach((taskId: number) => {
+      relatedObjects.push({
+        id: taskId,
+        type: 'task' as const,
+        title: `任务 #${taskId}`,
+        link: `/tasks/${taskId}`,
+      });
+    });
+  }
+  
   return {
     id: item.id,
     type: 'pipeline',
@@ -121,6 +155,7 @@ export function pipelineToDetail(item: Pipeline): DetailData {
       createdUser: item.owner || '系统',
       tags: ['流程'],
     },
+    relatedObjects: relatedObjects.length > 0 ? relatedObjects : undefined,
     timeline: [
       {
         timestamp: item.due_at || new Date().toISOString(),
@@ -136,6 +171,19 @@ export function pipelineToDetail(item: Pipeline): DetailData {
  * 日程转换为详情数据
  */
 export function eventToDetail(event: Event): DetailData {
+  const relatedObjects: any[] = [];
+  // Add linked tasks if available
+  if (event.linked_task_ids && event.linked_task_ids.length > 0) {
+    event.linked_task_ids.forEach((taskId: number) => {
+      relatedObjects.push({
+        id: taskId,
+        type: 'task' as const,
+        title: `任务 #${taskId}`,
+        link: `/tasks/${taskId}`,
+      });
+    });
+  }
+  
   return {
     id: event.id,
     type: 'event',
@@ -147,6 +195,7 @@ export function eventToDetail(event: Event): DetailData {
     metadata: {
       tags: [event.type || '日程'],
     },
+    relatedObjects: relatedObjects.length > 0 ? relatedObjects : undefined,
     timeline: [
       {
         timestamp: event.starts_at,

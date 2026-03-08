@@ -27,7 +27,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { taskId, status, priority, owner, nextAction, dueAt, actor = 'system', meta, comment } = body;
+  const { taskId, status, priority, owner, nextAction, dueAt, relatedPipelineId, relatedEventId, actor = 'system', meta, comment } = body;
 
   if (!taskId) {
     return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
@@ -77,6 +77,16 @@ export async function PATCH(request: Request) {
     if (dueAt !== undefined) {
       updates.push(`due_at = $${paramIndex}`);
       values.push(dueAt);
+      paramIndex++;
+    }
+    if (relatedPipelineId !== undefined) {
+      updates.push(`related_pipeline_id = $${paramIndex}`);
+      values.push(relatedPipelineId);
+      paramIndex++;
+    }
+    if (relatedEventId !== undefined) {
+      updates.push(`related_event_id = $${paramIndex}`);
+      values.push(relatedEventId);
       paramIndex++;
     }
 
@@ -189,6 +199,8 @@ export async function PATCH(request: Request) {
         owner,
         nextAction,
         dueAt,
+        relatedPipelineId,
+        relatedEventId,
       },
     });
   } catch (error) {
@@ -301,7 +313,8 @@ export async function GET(request: Request) {
     const now = new Date().toISOString();
 
     const dataQuery = `
-      SELECT id, title, status, priority, owner, blocker, next_action, due_at, source, updated_at
+      SELECT id, title, status, priority, owner, blocker, next_action, due_at, source, updated_at, 
+             related_pipeline_id, related_event_id
       FROM tasks
       ${whereClause}
       ${orderByClause}

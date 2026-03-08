@@ -11,15 +11,19 @@ export interface Task {
   next_action: string;
   due_at: string;
   updated_at?: string;
+  linked_pipeline_id?: number | null;
+  linked_event_id?: number | null;
 }
 
 // 管线
 export interface Pipeline {
   id: number;
   item_name: string;
+  name?: string; // Alias for item_name (for backward compatibility)
   stage: string;
   owner: string;
   due_at: string;
+  linked_task_id?: number | null;
 }
 
 // 日程
@@ -29,6 +33,7 @@ export interface Event {
   starts_at: string;
   ends_at: string;
   type: string;
+  linked_task_id?: number | null;
 }
 
 // 智能体

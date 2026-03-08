@@ -61,11 +61,15 @@ export async function GET(request: Request) {
     const total = parseInt(countResult.rows[0].total, 10);
     const now = new Date().toISOString();
 
+    // Fetch pipelines with linked task IDs (as array)
     const dataQuery = `
-      SELECT id, item_name, stage, owner, due_at, updated_at
-      FROM pipelines
+      SELECT p.id, p.item_name, p.stage, p.owner, p.due_at, p.updated_at,
+             COALESCE(ARRAY_AGG(t.id) FILTER (WHERE t.id IS NOT NULL), ARRAY[]::INTEGER[]) as linked_task_ids
+      FROM pipelines p
+      LEFT JOIN tasks t ON t.linked_pipeline_id = p.id
       ${whereClause}
-      ORDER BY due_at ASC NULLS LAST, id DESC
+      GROUP BY p.id
+      ORDER BY due_at ASC NULLS LAST, p.id DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     const dataParams = [...queryParams, safePageSize, offset];
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { item_name, stage = 'draft', owner = null, due_at = null } = body;
+  const { item_name, stage = 'draft', owner = null, due_at = null, related_task_id = null } = body;
 
   if (!item_name || typeof item_name !== 'string' || item_name.trim().length === 0) {
     return NextResponse.json({ error: 'item_name is required' }, { status: 400 });
@@ -136,10 +140,10 @@ export async function POST(request: Request) {
 
 
     const result = await pool.query(
-      `INSERT INTO pipelines (item_name, stage, owner, due_at, updated_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       RETURNING id, item_name, stage, owner, due_at, updated_at`,
-      [item_name.trim(), stage, owner, due_at]
+      `INSERT INTO pipelines (item_name, stage, owner, due_at, related_task_id, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       RETURNING id, item_name, stage, owner, due_at, related_task_id, updated_at`,
+      [item_name.trim(), stage, owner, due_at, related_task_id]
     );
 
     return NextResponse.json({
@@ -168,7 +172,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'id is required' }, { status: 400 });
   }
 
-  const allowedFields = ['item_name', 'stage', 'owner', 'due_at'];
+  const allowedFields = ['item_name', 'stage', 'owner', 'due_at', 'related_task_id'];
   const setClauses: string[] = [];
   const queryParams: any[] = [];
   let paramIndex = 1;
@@ -200,7 +204,7 @@ export async function PATCH(request: Request) {
       UPDATE pipelines
       SET ${setClauses.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, item_name, stage, owner, due_at, updated_at
+      RETURNING id, item_name, stage, owner, due_at, updated_at, related_task_id
     `;
 
     const result = await pool.query(query, [...queryParams, id]);

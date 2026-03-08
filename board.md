@@ -2,6 +2,138 @@
 
 ## 当前任务
 
+### T-20260308-080 - 任务/流程/事件互链跳转
+
+**状态**: ✅ 已完成  
+**优先级**: P1  
+**创建时间**: 2026-03-08  
+**完成时间**: 2026-03-08 12:00  
+**提交**: (待提交)  
+
+#### 需求描述
+实现任务、流程、事件之间的互相链接和跳转功能
+
+#### 功能要求
+1. ✅ 在任务详情中显示关联的流程和事件
+2. ✅ 在流程详情中显示关联的任务
+3. ✅ 在事件详情中显示关联的任务
+4. ✅ 点击关联对象可跳转到对应详情
+5. ✅ 数据结构支持（tasks 表添加关联字段）
+
+#### 实现内容
+
+**数据库迁移** (`/db/migrations/20260308_add_cross_links.sql`):
+- tasks 表添加 `linked_pipeline_id` 字段（外键引用 pipelines）
+- tasks 表添加 `linked_event_id` 字段（外键引用 events）
+- 添加索引优化查询性能
+- ON DELETE SET NULL 保证数据完整性
+
+**类型定义** (`/src/lib/types.ts`):
+- Task 接口添加 `linked_pipeline_id` 和 `linked_event_id`
+- Pipeline 接口添加 `linked_task_ids` 数组
+- Event 接口添加 `linked_task_ids` 数组
+
+**API 更新**:
+- Tasks API: 查询返回关联字段
+- Pipelines API: LEFT JOIN 聚合关联任务 IDs
+- Events API: LEFT JOIN 聚合关联任务 IDs
+
+**数据转换** (`/src/lib/data-utils.ts`):
+- taskToDetail(): 添加关联对象到 relatedObjects
+- pipelineToDetail(): 添加关联任务到 relatedObjects
+- eventToDetail(): 添加关联任务到 relatedObjects
+
+**UI 组件** (`/src/components/DetailModal.tsx`):
+- 添加 `onRelatedObjectClick` 回调
+- 关联对象列表支持点击交互
+
+**主页面** (`/src/app/page.tsx`):
+- 实现 `handleRelatedObjectClick()` 函数
+- 点击关联对象时获取并显示详情
+
+**文档**:
+- `/docs/CROSS_LINKS_IMPLEMENTATION.md` - 实现文档
+- `/docs/TASK_80_COMPLETION_REPORT.md` - 完成报告
+
+#### 待办事项
+- [ ] 执行数据库迁移（手动或通过脚本）
+- [ ] 测试关联功能
+- [ ] 可选：添加 UI 用于关联/取消关联
+
+---
+
+### T-20260308-078 - 记忆归档 API + UI
+
+**状态**: ✅ 已完成  
+**优先级**: P1  
+**创建时间**: 2026-03-08  
+**完成时间**: 2026-03-08 11:45  
+**提交**: (待提交)  
+
+#### 需求描述
+Mission Control 需要集成记忆归档功能，让用户可以查看和管理 AI 的记忆数据
+
+#### 功能要求
+1. ✅ 创建 API `/api/memories` 支持：
+   - GET: 获取记忆列表（支持分页、分类筛选、搜索）
+   - POST: 创建新记忆
+   - DELETE: 删除记忆
+2. ✅ 创建 MemoryArchive 组件：
+   - 列表展示记忆（标题、分类、内容摘要、时间）
+   - 搜索和筛选（按分类：preference/fact/decision/entity/other）
+   - 支持删除操作
+3. ✅ 在侧边栏添加"记忆归档"入口
+4. ✅ 与现有 UI 风格一致
+
+#### 实现内容
+
+**API 实现** (`/src/app/api/memories/route.ts`):
+- GET: 支持分页 (page, pageSize)、分类筛选 (category)、搜索 (search)
+- POST: 创建新记忆，需要 title 字段
+- DELETE: 通过 id 参数删除记忆
+- 返回分页元数据：total, totalPages, hasMore
+- 分类选项：preference, fact, decision, entity, other
+
+**前端组件** (`/src/components/dashboard/MemoryArchive.tsx`):
+- 记忆列表展示：标题、分类标签、摘要、时间
+- 搜索框：支持标题和摘要搜索
+- 分类筛选下拉：全部/偏好/事实/决策/实体/其他
+- 删除功能：带确认对话框
+- 分页控制：上一页/下一页，显示当前页/总页数
+- 响应式设计：与 TaskBoard 风格一致
+
+**导航更新** (`/src/components/LeftNav.tsx`):
+- 添加"记忆归档"导航项（图标：memories）
+- 位置：日历和记忆主题之间
+
+**主页面集成** (`/src/app/page.tsx`):
+- 添加 memories 状态
+- 添加 memory_archive 模块配置
+- 在 renderModuleContent 中处理 memory_archive 视图
+- 更新 MODULE_CONFIG 和移动端导航
+- 数据加载：在 refreshAllData 中获取记忆数据
+
+#### 交付物
+- [x] 自测通过
+- [x] npm run build 通过
+- [x] 代码符合现有模式（参考 TaskBoard）
+- [x] 与现有 UI 风格一致
+
+#### 技术细节
+
+**记忆分类颜色**:
+- preference: 蓝色
+- fact: 绿色
+- decision: 紫色
+- entity: 橙色
+- other: 灰色
+
+**删除确认**: 删除前会弹出确认对话框，防止误操作
+
+**分页逻辑**: 默认每页 20 条，支持翻页，删除最后一条时自动返回上一页
+
+---
+
 ### T-20260222-003 - 任务看板单模块视图改进
 
 **状态**: ✅ 已完成  

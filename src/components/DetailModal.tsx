@@ -83,6 +83,7 @@ interface DetailModalProps {
   onClose: () => void;
   data: DetailData | null;
   onTaskUpdated?: () => void; // 任务更新后的回调，用于刷新列表
+  onRelatedObjectClick?: (obj: RelatedObject) => void; // 关联对象点击回调
 }
 
 // ============ 工具函数 ============
@@ -211,7 +212,7 @@ function Timeline({
             </button>
             <button
               onClick={onSubmitComment}
-              disabled={isSaving || !commentText.trim()}
+              disabled={isSaving || !commentText?.trim()}
               className="text-xs px-3 py-1.5 rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 flex items-center space-x-1"
             >
               {isSaving ? (
@@ -363,7 +364,7 @@ function Actions({ actions }: ActionsProps) {
 }
 
 // ============ 详情浮窗组件（增强版） ============
-export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObjectClick }: DetailModalProps) {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'timeline' | 'related'>('details');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -511,6 +512,8 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
           owner: editedData.owner,
           nextAction: editedData.nextAction,
           dueAt: editedData.dueAt,
+          relatedPipelineId: editedData.extra?.related_pipeline_id,
+          relatedEventId: editedData.extra?.related_event_id,
           actor: 'user',
           meta: { reason: 'inline_edit' },
         }),
@@ -533,6 +536,9 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
         data.owner = editedData.owner;
         data.nextAction = editedData.nextAction;
         data.dueAt = editedData.dueAt;
+        if (editedData.extra) {
+          data.extra = { ...data.extra, ...editedData.extra };
+        }
       }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : '保存失败，请重试');
@@ -841,6 +847,58 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
                     )
                   )}
 
+                  {/* 关联流程项目（可编辑，仅任务类型） */}
+                  {data.type === 'task' && (
+                    isEditMode ? (
+                      <DetailField label="关联流程" icon="pipelines">
+                        <input
+                          type="number"
+                          value={editedData.extra?.related_pipeline_id ?? data.extra?.related_pipeline_id ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            handleFieldChange('extra', { ...editedData.extra, related_pipeline_id: val });
+                          }}
+                          placeholder="输入流程 ID"
+                          className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 w-full max-w-[200px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                        />
+                      </DetailField>
+                    ) : (
+                      data.extra?.related_pipeline_id && (
+                        <DetailField label="关联流程" icon="pipelines">
+                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.related_pipeline_id, type: 'pipeline', title: `流程 #${data.extra.related_pipeline_id}` })}>
+                            流程 #{data.extra.related_pipeline_id}
+                          </span>
+                        </DetailField>
+                      )
+                    )
+                  )}
+
+                  {/* 关联日程（可编辑，仅任务类型） */}
+                  {data.type === 'task' && (
+                    isEditMode ? (
+                      <DetailField label="关联日程" icon="calendar">
+                        <input
+                          type="number"
+                          value={editedData.extra?.related_event_id ?? data.extra?.related_event_id ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            handleFieldChange('extra', { ...editedData.extra, related_event_id: val });
+                          }}
+                          placeholder="输入日程 ID"
+                          className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 w-full max-w-[200px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                        />
+                      </DetailField>
+                    ) : (
+                      data.extra?.related_event_id && (
+                        <DetailField label="关联日程" icon="calendar">
+                          <span className="text-sm text-[var(--color-primary)] cursor-pointer hover:underline" onClick={() => onRelatedObjectClick?.({ id: data.extra.related_event_id, type: 'event', title: `日程 #${data.extra.related_event_id}` })}>
+                            日程 #{data.extra.related_event_id}
+                          </span>
+                        </DetailField>
+                      )
+                    )
+                  )}
+
                   {data.startsAt && (
                     <DetailField label="开始时间" icon="calendar">
                       <span className="text-sm text-[var(--text-primary)]">{formatDateTime(data.startsAt)}</span>
@@ -928,7 +986,7 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
 
                 {/* 内联关联对象预览（如果没有标签页） */}
                 {hasRelated && !hasTimeline && (
-                  <RelatedObjects objects={data.relatedObjects!} />
+                  <RelatedObjects objects={data.relatedObjects!} onObjectClick={onRelatedObjectClick} />
                 )}
 
                 {/* 额外字段 */}
@@ -971,7 +1029,7 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
             )}
 
             {activeTab === 'related' && hasRelated && (
-              <RelatedObjects objects={data.relatedObjects!} />
+              <RelatedObjects objects={data.relatedObjects!} onObjectClick={onRelatedObjectClick} />
             )}
           </div>
 

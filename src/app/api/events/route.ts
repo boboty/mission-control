@@ -94,10 +94,14 @@ export async function GET(request: Request) {
     const countResult = await pool.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total, 10);
 
+    // Fetch events with linked task IDs (as array)
     const dataQuery = `
-      SELECT id, title, starts_at, ends_at, type, source
-      FROM events
+      SELECT e.id, e.title, e.starts_at, e.ends_at, e.type, e.source,
+             COALESCE(ARRAY_AGG(t.id) FILTER (WHERE t.id IS NOT NULL), ARRAY[]::INTEGER[]) as linked_task_ids
+      FROM events e
+      LEFT JOIN tasks t ON t.linked_event_id = e.id
       ${whereClause}
+      GROUP BY e.id
       ORDER BY starts_at ASC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -164,7 +168,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, starts_at, ends_at, type = 'meeting', source } = body;
+    const { title, starts_at, ends_at, type = 'meeting', source, related_task_id = null } = body;
 
     // Validate required fields
     if (!title || !starts_at) {
@@ -177,9 +181,9 @@ export async function POST(request: NextRequest) {
     const pool = getPgPool(databaseUrl);
 
     const query = `
-      INSERT INTO events (title, starts_at, ends_at, type, source)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, title, starts_at, ends_at, type, source
+      INSERT INTO events (title, starts_at, ends_at, type, source, related_task_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, title, starts_at, ends_at, type, source, related_task_id
     `;
 
     const result = await pool.query(query, [
@@ -188,6 +192,7 @@ export async function POST(request: NextRequest) {
       ends_at || null,
       type,
       source || null,
+      related_task_id,
     ]);
 
     return NextResponse.json({
@@ -200,5 +205,64 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to create event', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
+  }
+}
+
+export async function PATCH(request: Request) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+  }
+
+  const body = await request.json();
+  const { id, ...updates } = body;
+
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
+
+  const allowedFields = ['title', 'starts_at', 'ends_at', 'type', 'source', 'related_task_id'];
+  const setClauses: string[] = [];
+  const queryParams: any[] = [];
+  let paramIndex = 1;
+
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      if (field === 'title' && (typeof updates[field] !== 'string' || updates[field].trim().length === 0)) {
+        return NextResponse.json({ error: 'title cannot be empty' }, { status: 400 });
+      }
+      setClauses.push(`${field} = $${paramIndex}`);
+      queryParams.push(field === 'title' ? updates[field].trim() : updates[field]);
+      paramIndex++;
+    }
+  }
+
+  if (setClauses.length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+  }
+
+  const pool = getPgPool(databaseUrl);
+
+  try {
+    const query = `
+      UPDATE events
+      SET ${setClauses.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING id, title, starts_at, ends_at, type, source, related_task_id
+    `;
+
+    const result = await pool.query(query, [...queryParams, id]);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      event: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Failed to update event:', error);
+    return NextResponse.json({ error: 'Failed to update event' }, { status: 500 });
   }
 }

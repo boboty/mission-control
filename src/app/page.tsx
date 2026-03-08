@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert } from '../components';
+import { Card, CardHeader, SkeletonCard, EmptyState, Metric, MetricGroup, StatusBadge, DetailModal, ClickableItem, LeftNav, DecisionCenter, AlertCard, aggregateAlerts, type DetailData, type Alert, type RelatedObject } from '../components';
 import { Icon } from '../components/Icon';
 import { TaskBoard, TaskItem, SortableTaskItem, Pagination } from '../components/dashboard/TaskBoard';
 import { Pipeline as PipelineComponent, PipelineItem } from '../components/dashboard/Pipeline';
@@ -11,7 +11,7 @@ import type { Pipeline as PipelineType } from '@/lib/types';
 import { TeamOverview } from '../components/dashboard/TeamOverview';
 import { KANBAN_COLUMNS } from '../lib/types';
 import { validateData, generateDataQualityReport } from '../lib/data-validation';
-import { pipelineToDetail } from '@/lib/data-utils';
+import { pipelineToDetail as pipelineToDetailLib, taskToDetail as taskToDetailLib, eventToDetail as eventToDetailLib } from '@/lib/data-utils';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -596,7 +596,8 @@ const MODULE_CONFIG = [
   { name: '任务看板', icon: 'tasks', color: 'from-blue-500 to-blue-600', key: 'tasks' },
   { name: '业务管线', icon: 'pipelines', color: 'from-violet-500 to-violet-600', key: 'pipelines' },
   { name: '日历', icon: 'events', color: 'from-emerald-500 to-emerald-600', key: 'events' },
-  { name: '记忆主题', icon: 'memories', color: 'from-orange-500 to-orange-600', key: 'memory_topics' },
+  { name: '记忆归档', icon: 'memories', color: 'from-orange-500 to-orange-600', key: 'memory_archive' },
+  { name: '记忆主题', icon: 'folder', color: 'from-amber-500 to-amber-600', key: 'memory_topics' },
   { name: '团队概览', icon: 'agents', color: 'from-fuchsia-500 to-fuchsia-600', key: 'agents' },
   { name: '运行健康', icon: 'health', color: 'from-rose-500 to-rose-600', key: 'health' },
 ];
@@ -607,7 +608,7 @@ export default function Dashboard() {
   const [pipelines, setPipelines] = useState<PipelineType[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  // memories (DB table) UI removed; keep API for potential future use.
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [health, setHealth] = useState<Health[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [memoryTopics, setMemoryTopics] = useState<MemoryTopic[]>([]);
@@ -738,11 +739,12 @@ export default function Dashboard() {
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       });
 
-      const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
+      const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoriesRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
         fetch(`/api/tasks?page=1&pageSize=20`),
         fetch('/api/pipelines'),
         fetch(`/api/events?${eventsInitParams.toString()}`),
         fetch('/api/agents'),
+        fetch('/api/memories?page=1&pageSize=20'),
         fetch('/api/memory-topics'),
         fetch('/api/health'),
         fetch('/api/metrics'),
@@ -771,6 +773,9 @@ export default function Dashboard() {
         setEventPage(eventsData.pagination?.page || 1);
       }
       if (agentsData.agents) setAgents(agentsData.agents);
+      if (memoriesData?.memories || memoriesData?.data) {
+        setMemories(memoriesData.memories || memoriesData.data || []);
+      }
       if (memoryTopicsData?.topics) {
         setMemoryTopics(memoryTopicsData.topics);
       }
@@ -941,6 +946,39 @@ export default function Dashboard() {
     setSelectedItem(data);
     setDetailOpen(true);
   };
+
+  // 处理关联对象点击
+  const handleRelatedObjectClick = async (obj: RelatedObject) => {
+    try {
+      let detailData: DetailData | null = null;
+      
+      if (obj.type === 'task') {
+        const res = await fetch(`/api/tasks?taskId=${obj.id}`);
+        const data = await res.json();
+        if (data.tasks && data.tasks.length > 0) {
+          detailData = taskToDetailLib(data.tasks[0]);
+        }
+      } else if (obj.type === 'pipeline') {
+        const res = await fetch(`/api/pipelines?id=${obj.id}`);
+        const data = await res.json();
+        if (data.pipelines && data.pipelines.length > 0) {
+          detailData = pipelineToDetailLib(data.pipelines[0]);
+        }
+      } else if (obj.type === 'event') {
+        const res = await fetch(`/api/events?id=${obj.id}`);
+        const data = await res.json();
+        if (data.events && data.events.length > 0) {
+          detailData = eventToDetailLib(data.events[0]);
+        }
+      }
+      
+      if (detailData) {
+        openDetail(detailData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch related object details:', error);
+    }
+  };
   const eventTypeOptions = Array.from(new Set(events.map(e => e.type).filter(Boolean)));
   
   // 渲染模块内容
@@ -1046,7 +1084,7 @@ export default function Dashboard() {
               <PipelineItem 
                 key={item.id} 
                 item={item} 
-                onClick={() => openDetail(pipelineToDetail(item))}
+                onClick={() => openDetail(pipelineToDetailLib(item))}
               />
             ))}
           </div>
@@ -1072,6 +1110,16 @@ export default function Dashboard() {
         );
       case 'agents':
         return <TeamOverview agents={agents} openDetail={openDetail} />;
+      case 'memory_archive':
+        const MemoryArchiveComponent = require('@/components/dashboard/MemoryArchive').MemoryArchive;
+        return (
+          <MemoryArchiveComponent
+            memories={memories}
+            setMemories={setMemories}
+            loading={loading}
+            openDetail={openDetail}
+          />
+        );
       case 'memory_topics':
         if (memoryTopicsLoading) {
           return <div className="py-4 text-center text-sm text-[var(--text-muted)]">加载中...</div>;
@@ -1481,6 +1529,7 @@ export default function Dashboard() {
                                 subtitle={
                                   module.key === 'pipelines' ? `共 ${pipelines.length} 项流程` :
                                   module.key === 'events' ? `共 ${eventPagination?.total ?? events.length} 项日程` :
+                                  module.key === 'memory_archive' ? `共 ${memories.length} 条记忆` :
                                   module.key === 'memory_topics' ? `共 ${memoryTopics.length} 个主题` :
                                   module.key === 'agents' ? `共 ${agents.length} 个智能体` :
                                   `共 ${health.length} 次检测`
@@ -1503,7 +1552,7 @@ export default function Dashboard() {
           {/* 移动端底部导航 */}
           {isMobile && (
             <nav className="mobile-bottom-nav" role="navigation" aria-label="底部导航">
-              {MODULE_CONFIG.slice(0, 5).map((module) => (
+              {MODULE_CONFIG.slice(0, 6).map((module) => (
                 <button
                   key={module.key}
                   onClick={() => setActiveModule(module.key)}
@@ -1582,6 +1631,7 @@ export default function Dashboard() {
               // 任务更新后刷新列表
               fetchTasks(taskPage);
             }}
+            onRelatedObjectClick={handleRelatedObjectClick}
           />
 
         </div>

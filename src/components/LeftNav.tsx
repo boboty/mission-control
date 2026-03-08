@@ -26,7 +26,8 @@ const navItems: NavItem[] = [
   { key: 'tasks', label: '任务看板', icon: 'tasks' },
   { key: 'pipelines', label: '业务管线', icon: 'pipelines' },
   { key: 'events', label: '日历', icon: 'events' },
-  { key: 'memory_topics', label: '记忆主题', icon: 'memories' },
+  { key: 'memory_archive', label: '记忆归档', icon: 'memories' },
+  { key: 'memory_topics', label: '记忆主题', icon: 'folder' },
   { key: 'agents', label: '团队概览', icon: 'agents' },
   { key: 'health', label: '运行健康', icon: 'health' },
 ];
