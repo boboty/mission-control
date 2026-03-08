@@ -145,6 +145,19 @@ function formatUpdateTime(dateStr: string | null): string {
   });
 }
 
+function formatRefreshTime(date: Date | null): string {
+  if (!date) return '';
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  
+  if (seconds < 10) return '刚刚';
+  if (seconds < 60) return `${seconds}秒前`;
+  if (minutes < 60) return `${minutes}分钟前`;
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
 // 按状态分组任务
 function groupTasksByStatus(tasks: Task[]): Record<string, Task[]> {
   return tasks.reduce((groups, task) => {
@@ -531,6 +544,12 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [dataSource] = useState('Supabase');
   
+  // 刷新控制状态
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [autoRefreshInterval] = useState(60000); // 60 秒
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  
   // 任务看板控制状态
   const [taskSortBy, setTaskSortBy] = useState<'default' | 'priority' | 'dueDate' | 'status'>('default');
   const [taskViewMode, setTaskViewMode] = useState<'list' | 'grouped' | 'kanban'>('list');
@@ -622,6 +641,103 @@ export default function Dashboard() {
   // 数据验证状态
   const [dataValidation, setDataValidation] = useState<Record<string, { valid: boolean; warnings: string[] }>>({});
 
+  // 刷新所有数据
+  const refreshAllData = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsRefreshing(true);
+    
+    try {
+      const eventsInitParams = new URLSearchParams({
+        page: '1',
+        pageSize: '20',
+        view: 'upcoming',
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      });
+
+      const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
+        fetch(`/api/tasks?page=1&pageSize=20`),
+        fetch('/api/pipelines'),
+        fetch(`/api/events?${eventsInitParams.toString()}`),
+        fetch('/api/agents'),
+        fetch('/api/memory-topics'),
+        fetch('/api/health'),
+        fetch('/api/metrics'),
+        fetch('/api/decisions'),
+      ]);
+
+      const tasksData = await tasksRes.json();
+      const pipelinesData = await pipelinesRes.json();
+      const eventsData = await eventsRes.json();
+      const agentsData = await agentsRes.json();
+      const memoryTopicsData = await memoryTopicsRes.json();
+      const healthData = await healthRes.json();
+      const metricsData = await metricsRes.json();
+      const decisionsData = await decisionsRes.json();
+
+      if (tasksData.tasks) {
+        setTasks(tasksData.tasks);
+        setTaskPagination(tasksData.pagination);
+        const validation = validateData('tasks', tasksData.tasks);
+        setDataValidation(prev => ({ ...prev, tasks: { valid: validation.valid, warnings: validation.warnings } }));
+      }
+      if (pipelinesData.pipelines) setPipelines(pipelinesData.pipelines);
+      if (eventsData.events) {
+        setEvents(eventsData.events);
+        setEventPagination(eventsData.pagination);
+        setEventPage(eventsData.pagination?.page || 1);
+      }
+      if (agentsData.agents) setAgents(agentsData.agents);
+      if (memoryTopicsData?.topics) {
+        setMemoryTopics(memoryTopicsData.topics);
+      }
+      if (healthData.health) {
+        setHealth(healthData.health);
+        const validation = validateData('health', healthData.health);
+        setDataValidation(prev => ({ ...prev, health: { valid: validation.valid, warnings: validation.warnings } }));
+      }
+      if (metricsData.metrics) setMetricsState(metricsData);
+      if (decisionsData.decisions) {
+        setDecisions(decisionsData.decisions);
+        if (decisionsData.summary) {
+          setDecisionSummary(decisionsData.summary);
+        }
+      }
+
+      const syncCandidates = [
+        tasksData?.last_sync_at,
+        pipelinesData?.last_sync_at,
+        eventsData?.last_sync_at,
+        agentsData?.last_sync_at,
+        healthData?.last_sync_at,
+        metricsData?.last_sync_at,
+        decisionsData?.last_sync_at,
+      ].filter(Boolean);
+      const lastUpdate = syncCandidates.length > 0
+        ? syncCandidates.sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0]
+        : new Date().toISOString();
+      setLastUpdated(lastUpdate);
+      setLastRefreshTime(new Date());
+      
+      // 生成告警
+      const generatedAlerts = aggregateAlerts(healthData.health || [], tasksData.tasks || [], lastUpdate);
+      setAlerts(generatedAlerts);
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+    } finally {
+      if (showLoading) setIsRefreshing(false);
+    }
+  }, []);
+
+  // 自动刷新定时器
+  useEffect(() => {
+    if (!autoRefreshEnabled) return;
+    
+    const interval = setInterval(() => {
+      refreshAllData(false); // 静默刷新，不显示加载状态
+    }, autoRefreshInterval);
+    
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, autoRefreshInterval, refreshAllData]);
+
   // 获取任务数据（支持分页、筛选、搜索）
   const fetchTasks = useCallback(async (page = 1) => {
     setTaskLoading(true);
@@ -682,80 +798,7 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const eventsInitParams = new URLSearchParams({
-          page: '1',
-          pageSize: '20',
-          view: 'upcoming',
-          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-        });
-
-        const [tasksRes, pipelinesRes, eventsRes, agentsRes, memoryTopicsRes, healthRes, metricsRes, decisionsRes] = await Promise.all([
-          fetch('/api/tasks?page=1&pageSize=20'),
-          fetch('/api/pipelines'),
-          fetch(`/api/events?${eventsInitParams.toString()}`),
-          fetch('/api/agents'),
-          fetch('/api/memory-topics'),
-          fetch('/api/health'),
-          fetch('/api/metrics'),
-          fetch('/api/decisions'),
-        ]);
-
-        const tasksData = await tasksRes.json();
-        const pipelinesData = await pipelinesRes.json();
-        const eventsData = await eventsRes.json();
-        const agentsData = await agentsRes.json();
-        const memoryTopicsData = await memoryTopicsRes.json();
-        const healthData = await healthRes.json();
-        const metricsData = await metricsRes.json();
-        const decisionsData = await decisionsRes.json();
-
-        if (tasksData.tasks) {
-          setTasks(tasksData.tasks);
-          setTaskPagination(tasksData.pagination);
-          const validation = validateData('tasks', tasksData.tasks);
-          setDataValidation(prev => ({ ...prev, tasks: { valid: validation.valid, warnings: validation.warnings } }));
-        }
-        if (pipelinesData.pipelines) setPipelines(pipelinesData.pipelines);
-        if (eventsData.events) {
-          setEvents(eventsData.events);
-          setEventPagination(eventsData.pagination);
-          setEventPage(eventsData.pagination?.page || 1);
-        }
-        if (agentsData.agents) setAgents(agentsData.agents);
-        if (memoryTopicsData?.topics) {
-          setMemoryTopics(memoryTopicsData.topics);
-        }
-        if (healthData.health) {
-          setHealth(healthData.health);
-          const validation = validateData('health', healthData.health);
-          setDataValidation(prev => ({ ...prev, health: { valid: validation.valid, warnings: validation.warnings } }));
-        }
-        if (metricsData.metrics) setMetricsState(metricsData);
-        if (decisionsData.decisions) {
-          setDecisions(decisionsData.decisions);
-          if (decisionsData.summary) {
-            setDecisionSummary(decisionsData.summary);
-          }
-        }
-
-        const syncCandidates = [
-          tasksData?.last_sync_at,
-          pipelinesData?.last_sync_at,
-          eventsData?.last_sync_at,
-          agentsData?.last_sync_at,
-          healthData?.last_sync_at,
-          metricsData?.last_sync_at,
-          decisionsData?.last_sync_at,
-        ].filter(Boolean);
-        const lastUpdate = syncCandidates.length > 0
-          ? syncCandidates.sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0]
-          : new Date().toISOString();
-        setLastUpdated(lastUpdate);
-        
-        // 生成告警
-        const generatedAlerts = aggregateAlerts(healthData.health || [], tasksData.tasks || [], lastUpdate);
-        setAlerts(generatedAlerts);
-        
+        await refreshAllData(true);
         setLoading(false);
       } catch (err) {
         setError('无法从数据库加载数据，请检查网络连接');
@@ -779,22 +822,6 @@ export default function Dashboard() {
       fetchEvents(1);
     }
   }, [loading, activeModule, eventTypeFilter, eventSearch, eventFrom, eventTo, eventView, fetchEvents]);
-
-  // Agent 状态轮询（每 10 秒刷新一次）
-  useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        const res = await fetch('/api/agents');
-        const data = await res.json();
-        if (data.agents) setAgents(data.agents);
-      } catch (e) {
-        // ignore
-      }
-    };
-    
-    const interval = setInterval(fetchAgents, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   // 处理分页变化
   const handleTaskPageChange = (newPage: number) => {
@@ -1040,6 +1067,11 @@ export default function Dashboard() {
                       · 最近同步：{formatUpdateTime(lastUpdated)}
                     </span>
                   )}
+                  {lastRefreshTime && (
+                    <span className="text-[var(--text-muted)]">
+                      · 刷新：{formatRefreshTime(lastRefreshTime)}
+                    </span>
+                  )}
                   {activeModule !== 'dashboard' && (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-medium text-xs">
                       单模块视图
@@ -1047,9 +1079,59 @@ export default function Dashboard() {
                   )}
                 </p>
               </div>
-              {activeModule === 'dashboard' && <SystemStatus health={health} />}
+              <div className="flex items-center gap-3">
+                {activeModule === 'dashboard' && <SystemStatus health={health} />}
+                {/* 自动刷新开关 */}
+                <button
+                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                  className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    autoRefreshEnabled
+                      ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                      : 'bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] text-[var(--text-muted)]'
+                  }`}
+                  title={autoRefreshEnabled ? '自动刷新已启用 (60 秒)' : '自动刷新已禁用'}
+                >
+                  <Icon 
+                    name="clock" 
+                    size={16} 
+                    className="mr-1.5" 
+                  />
+                  自动刷新
+                </button>
+                {/* 手动刷新按钮 */}
+                <button
+                  onClick={() => refreshAllData(true)}
+                  disabled={isRefreshing}
+                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    isRefreshing
+                      ? 'bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] text-[var(--text-muted)] cursor-not-allowed'
+                      : 'bg-[var(--color-primary)] text-white hover:opacity-90'
+                  }`}
+                  title="手动刷新所有数据"
+                >
+                  <Icon 
+                    name="refresh" 
+                    size={16} 
+                    className="mr-1.5" 
+                  />
+                  {isRefreshing ? '刷新中...' : '刷新'}
+                </button>
+              </div>
             </div>
           </header>
+
+          {/* 刷新状态指示器 - 非阻断式 */}
+          {isRefreshing && (
+            <div className="mb-6 p-3 rounded-xl bg-[var(--color-primary-soft)] dark:bg-[var(--color-primary-soft)] border border-[var(--color-primary)]/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon name="refresh" size={16} className="text-[var(--color-primary)]" />
+                <span className="text-sm font-medium text-[var(--color-primary)]">正在刷新数据...</span>
+              </div>
+              <span className="text-xs text-[var(--text-muted)]">
+                自动刷新：{autoRefreshEnabled ? '已启用' : '已禁用'}
+              </span>
+            </div>
+          )}
 
           {/* 错误提示 - 优化样式 */}
           {error && (
@@ -1367,6 +1449,10 @@ export default function Dashboard() {
             isOpen={detailOpen}
             onClose={() => setDetailOpen(false)}
             data={selectedItem}
+            onTaskUpdated={() => {
+              // 任务更新后刷新列表
+              fetchTasks(taskPage);
+            }}
           />
 
         </div>

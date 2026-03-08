@@ -17,7 +17,26 @@ interface TaskBoardProps {
   setTaskViewMode?: (mode: 'list' | 'grouped' | 'kanban') => void;
 }
 
-export function SortableTaskItem({ task, onClick }: { task: Task; onClick: () => void }) {
+interface BulkUpdatePayload {
+  taskIds: number[];
+  status?: string;
+  priority?: string;
+  owner?: string;
+  actor?: string;
+  meta?: Record<string, any>;
+}
+
+export function SortableTaskItem({ 
+  task, 
+  onClick,
+  selected,
+  onToggleSelect
+}: { 
+  task: Task; 
+  onClick: () => void;
+  selected?: boolean;
+  onToggleSelect?: (taskId: number) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   return (
     <div
@@ -35,26 +54,66 @@ export function SortableTaskItem({ task, onClick }: { task: Task; onClick: () =>
       tabIndex={0}
       role="button"
       aria-label={`任务：${task.title}`}
-      className={`group mb-2 cursor-grab rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:cursor-grabbing active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${isDragging ? 'opacity-60 shadow-lg rotate-2' : ''}`}
+      className={`group mb-2 cursor-grab rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/95 p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:cursor-grabbing active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset ${isDragging ? 'opacity-60 shadow-lg rotate-2' : ''} ${selected ? 'ring-2 ring-[var(--color-primary)] bg-[var(--color-primary)]/5' : ''}`}
     >
-      <div className="text-xs font-medium text-[var(--text-primary)] line-clamp-2">{task.title}</div>
-      {task.priority === 'high' && <span className="mt-1.5 inline-block rounded-md bg-[var(--badge-warning-bg)] px-1.5 py-0.5 text-[10px] text-[var(--badge-warning-text)] font-medium animate-pulse-soft">高优</span>}
+      <div className="flex items-start gap-2">
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={selected || false}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect(task.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-0.5 h-4 w-4 rounded border-[var(--border-medium)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium text-[var(--text-primary)] line-clamp-2">{task.title}</div>
+          {task.priority === 'high' && <span className="mt-1.5 inline-block rounded-md bg-[var(--badge-warning-bg)] px-1.5 py-0.5 text-[10px] text-[var(--badge-warning-text)] font-medium animate-pulse-soft">高优</span>}
+        </div>
+      </div>
     </div>
   );
 }
 
-export function TaskItem({ task, onClick }: { task: Task; onClick: () => void }) {
+export function TaskItem({ 
+  task, 
+  onClick,
+  selected,
+  onToggleSelect
+}: { 
+  task: Task; 
+  onClick: () => void;
+  selected?: boolean;
+  onToggleSelect?: (taskId: number) => void;
+}) {
   const isBlocked = task.blocker || task.status === 'blocked';
   return (
     <ClickableItem onClick={onClick} isBlocked={isBlocked} className="-mx-2 px-2 rounded-lg">
-      <div className={`flex items-start justify-between py-2.5 border-b border-[var(--border-light)] last:border-0 transition-all duration-200 ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-1' : ''}`}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2">
-            <span className={`text-sm truncate ${isBlocked || task.priority === 'high' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{task.title}</span>
-            {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium animate-pulse-soft">🚫 阻塞</span>}
+      <div className={`flex items-start justify-between py-2.5 border-b border-[var(--border-light)] last:border-0 transition-all duration-200 ${isBlocked ? 'bg-[var(--badge-error-bg)]/30 border-l-4 border-l-[var(--color-danger)] pl-1' : ''} ${selected ? 'bg-[var(--color-primary)]/5' : ''}`}>
+        <div className="flex-1 min-w-0 flex items-start gap-2">
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={selected || false}
+              onChange={(e) => {
+                e.stopPropagation();
+                onToggleSelect(task.id);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="mt-0.5 h-4 w-4 rounded border-[var(--border-medium)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2">
+              <span className={`text-sm truncate ${isBlocked || task.priority === 'high' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{task.title}</span>
+              {task.blocker && <span className="text-xs bg-[var(--color-danger)] text-white px-2 py-0.5 rounded-full font-medium animate-pulse-soft">🚫 阻塞</span>}
+            </div>
+            {task.next_action && <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>}
+            {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center"><span className="mr-1">📅</span> 截止：{formatDate(task.due_at)}</p>}
           </div>
-          {task.next_action && <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{task.next_action}</p>}
-          {task.due_at && <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center"><span className="mr-1">📅</span> 截止：{formatDate(task.due_at)}</p>}
         </div>
         <StatusBadge status={task.status} size="sm" />
       </div>
@@ -99,6 +158,15 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
   const [taskPagination, setTaskPagination] = useState<PaginationInfo | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
+  
+  // Bulk operation state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkPriority, setBulkPriority] = useState('');
+  const [bulkOwner, setBulkOwner] = useState('');
+  
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchTasks = async (page = 1) => {
@@ -115,6 +183,77 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
       }
     } finally {
       setTaskLoading(false);
+      // Clear bulk selection on refresh
+      if (selectedTaskIds.size > 0) {
+        setSelectedTaskIds(new Set());
+        setBulkMode(false);
+      }
+    }
+  };
+
+  // Bulk selection handlers
+  const toggleTaskSelection = (taskId: number) => {
+    const newSelected = new Set(selectedTaskIds);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTaskIds(newSelected);
+    setBulkMode(newSelected.size > 0);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTaskIds.size === tasks.length) {
+      setSelectedTaskIds(new Set());
+      setBulkMode(false);
+    } else {
+      const allIds = new Set(tasks.map(t => t.id));
+      setSelectedTaskIds(allIds);
+      setBulkMode(true);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedTaskIds.size === 0) return;
+    
+    setBulkLoading(true);
+    try {
+      const payload: BulkUpdatePayload = {
+        taskIds: Array.from(selectedTaskIds),
+        actor: 'user',
+        meta: { reason: 'bulk_update' },
+      };
+      
+      if (bulkStatus) payload.status = bulkStatus;
+      if (bulkPriority) payload.priority = bulkPriority;
+      if (bulkOwner) payload.owner = bulkOwner;
+      
+      // Call bulk update API (or loop through individual updates)
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Bulk update failed');
+      }
+      
+      // Refresh tasks after successful update
+      await fetchTasks(1);
+      
+      // Reset bulk state
+      setSelectedTaskIds(new Set());
+      setBulkMode(false);
+      setBulkStatus('');
+      setBulkPriority('');
+      setBulkOwner('');
+    } catch (error) {
+      console.error('Bulk update error:', error);
+      // Optionally show error toast here
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -148,6 +287,71 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
 
   return (
     <div>
+      {/* Bulk Action Toolbar */}
+      {bulkMode && (
+        <div className="mb-4 p-3 rounded-xl border-2 border-[var(--color-primary)] bg-[var(--color-primary)]/5 animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[var(--color-primary)]">
+                已选择 {selectedTaskIds.size} 个任务
+              </span>
+              <button
+                onClick={toggleSelectAll}
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] underline"
+              >
+                {selectedTaskIds.size === tasks.length ? '取消全选' : '全选'}
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedTaskIds(new Set());
+                setBulkMode(false);
+              }}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              ✕ 关闭
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              className="px-3 py-1.5 text-sm border rounded-md bg-[var(--bg-secondary)]"
+            >
+              <option value="">修改状态...</option>
+              {STATUS_OPTIONS.filter(o => o.value).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <select
+              value={bulkPriority}
+              onChange={(e) => setBulkPriority(e.target.value)}
+              className="px-3 py-1.5 text-sm border rounded-md bg-[var(--bg-secondary)]"
+            >
+              <option value="">修改优先级...</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+            <input
+              type="text"
+              value={bulkOwner}
+              onChange={(e) => setBulkOwner(e.target.value)}
+              placeholder="负责人..."
+              className="px-3 py-1.5 text-sm border rounded-md bg-[var(--bg-secondary)] w-32"
+            />
+            <button
+              onClick={handleBulkUpdate}
+              disabled={bulkLoading || (!bulkStatus && !bulkPriority && !bulkOwner)}
+              className="px-4 py-1.5 text-sm font-medium rounded-md bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              {bulkLoading && <span className="animate-spin">⏳</span>}
+              应用
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3 mb-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -188,7 +392,15 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
                   </div>
                   <div className="min-h-[220px] rounded-b-2xl bg-[var(--bg-tertiary)]/80 p-2.5">
                     <SortableContext items={colTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                      {colTasks.map((task) => <SortableTaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} />)}
+                      {colTasks.map((task) => (
+                        <SortableTaskItem 
+                          key={task.id} 
+                          task={task} 
+                          onClick={() => openDetail(taskToDetail(task))}
+                          selected={selectedTaskIds.has(task.id)}
+                          onToggleSelect={toggleTaskSelection}
+                        />
+                      ))}
                     </SortableContext>
                   </div>
                 </div>
@@ -205,7 +417,7 @@ export function TaskBoard({ tasks, setTasks, loading, openDetail, taskViewMode: 
         </DndContext>
       ) : (
         <div className="overflow-y-auto -mx-2">
-          {(taskViewMode === 'grouped' ? Object.entries(groupTasksByStatus(tasks)).flatMap(([status, list]) => [<h4 key={status} className="text-xs font-semibold px-2 py-2 text-[var(--text-muted)]">{(STATUS_GROUP_NAMES as Record<string, string>)[status] || status} · {list.length}</h4>, ...list.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} />)]) : tasks.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} />))}
+          {(taskViewMode === 'grouped' ? Object.entries(groupTasksByStatus(tasks)).flatMap(([status, list]) => [<h4 key={status} className="text-xs font-semibold px-2 py-2 text-[var(--text-muted)]">{(STATUS_GROUP_NAMES as Record<string, string>)[status] || status} · {list.length}</h4>, ...list.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} selected={selectedTaskIds.has(task.id)} onToggleSelect={toggleTaskSelection} />)]) : tasks.map((task) => <TaskItem key={task.id} task={task} onClick={() => openDetail(taskToDetail(task))} selected={selectedTaskIds.has(task.id)} onToggleSelect={toggleTaskSelection} />))}
           {taskPagination && <Pagination pagination={taskPagination} onPageChange={fetchTasks} />}
         </div>
       )}

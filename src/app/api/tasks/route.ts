@@ -9,10 +9,10 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { taskId, status, actor = 'system', meta } = body;
+  const { taskId, status, priority, owner, nextAction, dueAt, actor = 'system', meta } = body;
 
-  if (!taskId || !status) {
-    return NextResponse.json({ error: 'taskId and status are required' }, { status: 400 });
+  if (!taskId) {
+    return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
   }
 
   const pool = getPgPool(databaseUrl);
@@ -22,27 +22,73 @@ export async function PATCH(request: Request) {
 
     await pool.query('BEGIN');
 
-    // Get current task status
-    const taskResult = await pool.query('SELECT status FROM tasks WHERE id = $1', [taskId]);
+    // Get current task
+    const taskResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
     if (taskResult.rows.length === 0) {
       await pool.query('ROLLBACK');
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const fromStatus = taskResult.rows[0].status;
+    const oldTask = taskResult.rows[0];
+    const fromStatus = oldTask.status;
 
-    // Update task status
-    await pool.query(
-      'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2',
-      [status, taskId]
-    );
+    // Build update query dynamically based on provided fields
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
 
-    // Insert event record
-    await pool.query(
-      `INSERT INTO task_events (task_id, event_type, from_status, to_status, actor, meta, created_at)
-       VALUES ($1, 'status_change', $2, $3, $4, $5, NOW())`,
-      [taskId, fromStatus, status, actor, meta ? JSON.stringify(meta) : null]
-    );
+    if (status !== undefined) {
+      updates.push(`status = $${paramIndex}`);
+      values.push(status);
+      paramIndex++;
+    }
+    if (priority !== undefined) {
+      updates.push(`priority = $${paramIndex}`);
+      values.push(priority);
+      paramIndex++;
+    }
+    if (owner !== undefined) {
+      updates.push(`owner = $${paramIndex}`);
+      values.push(owner);
+      paramIndex++;
+    }
+    if (nextAction !== undefined) {
+      updates.push(`next_action = $${paramIndex}`);
+      values.push(nextAction);
+      paramIndex++;
+    }
+    if (dueAt !== undefined) {
+      updates.push(`due_at = $${paramIndex}`);
+      values.push(dueAt);
+      paramIndex++;
+    }
+
+    // Always update updated_at
+    updates.push(`updated_at = NOW()`);
+
+    if (updates.length === 1) {
+      // Only updated_at would be set, nothing to update
+      await pool.query('ROLLBACK');
+      return NextResponse.json({
+        success: true,
+        taskId,
+        message: 'No fields to update',
+      });
+    }
+
+    const updateQuery = `UPDATE tasks SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+    values.push(taskId);
+
+    await pool.query(updateQuery, values);
+
+    // Insert event record if status changed
+    if (status !== undefined && status !== fromStatus) {
+      await pool.query(
+        `INSERT INTO task_events (task_id, event_type, from_status, to_status, actor, meta, created_at)
+         VALUES ($1, 'status_change', $2, $3, $4, $5, NOW())`,
+        [taskId, fromStatus, status, actor, meta ? JSON.stringify(meta) : null]
+      );
+    }
 
     await pool.query('COMMIT');
 
@@ -50,12 +96,19 @@ export async function PATCH(request: Request) {
       success: true,
       taskId,
       fromStatus,
-      toStatus: status,
+      toStatus: status || fromStatus,
+      updated: {
+        status,
+        priority,
+        owner,
+        nextAction,
+        dueAt,
+      },
     });
   } catch (error) {
     await pool.query('ROLLBACK');
-    console.error('Failed to update task status:', error);
-    return NextResponse.json({ error: 'Failed to update task status' }, { status: 500 });
+    console.error('Failed to update task:', error);
+    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   } finally {
     // pool: do not end per-request
 

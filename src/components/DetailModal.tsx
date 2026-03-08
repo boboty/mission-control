@@ -82,6 +82,7 @@ interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: DetailData | null;
+  onTaskUpdated?: () => void; // 任务更新后的回调，用于刷新列表
 }
 
 // ============ 工具函数 ============
@@ -270,9 +271,13 @@ function Actions({ actions }: ActionsProps) {
 }
 
 // ============ 详情浮窗组件（增强版） ============
-export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModalProps) {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'timeline' | 'related'>('details');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedData, setEditedData] = useState<Partial<DetailData>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // 键盘事件处理
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -298,8 +303,86 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
     if (isOpen) {
       setCopied(false);
       setActiveTab('details');
+      setIsEditMode(false);
+      setEditedData({});
+      setSaveError(null);
     }
   }, [isOpen]);
+
+  // 进入编辑模式
+  const handleEnterEditMode = () => {
+    if (data) {
+      setEditedData({
+        status: data.status,
+        priority: data.priority,
+        owner: data.owner,
+        nextAction: data.nextAction,
+        dueAt: data.dueAt,
+      });
+      setIsEditMode(true);
+      setSaveError(null);
+    }
+  };
+
+  // 退出编辑模式
+  const handleExitEditMode = () => {
+    setIsEditMode(false);
+    setEditedData({});
+    setSaveError(null);
+  };
+
+  // 保存修改
+  const handleSave = async () => {
+    if (!data || data.type !== 'task') return;
+    
+    setIsSaving(true);
+    setSaveError(null);
+    
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: data.id,
+          status: editedData.status,
+          priority: editedData.priority,
+          owner: editedData.owner,
+          nextAction: editedData.nextAction,
+          dueAt: editedData.dueAt,
+          actor: 'user',
+          meta: { reason: 'inline_edit' },
+        }),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || '保存失败');
+      }
+      
+      // 保存成功，通知父组件刷新列表
+      onTaskUpdated?.();
+      setIsEditMode(false);
+      setSaveError(null);
+      
+      // 更新本地显示的数据（乐观更新）
+      if (data) {
+        data.status = editedData.status;
+        data.priority = editedData.priority;
+        data.owner = editedData.owner;
+        data.nextAction = editedData.nextAction;
+        data.dueAt = editedData.dueAt;
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '保存失败，请重试');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 更新编辑字段
+  const handleFieldChange = (field: keyof DetailData, value: any) => {
+    setEditedData(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleCopyId = () => {
     if (data && copyToClipboard(String(data.id))) {
@@ -349,7 +432,7 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
                 <h2 id="modal-title" className="text-lg font-semibold text-[var(--text-primary)] truncate">
                   {data.title}
                 </h2>
-                {data.status && <StatusBadge status={data.status} size="sm" />}
+                {data.status && <StatusBadge status={isEditMode ? (editedData.status || data.status) : data.status} size="sm" />}
               </div>
               <div className="flex items-center space-x-2 text-xs text-[var(--text-muted)]">
                 <span className="capitalize">{getTypeLabel(data.type)}</span>
@@ -363,20 +446,34 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
                   <>
                     <span>·</span>
                     <span className={data.priority === 'high' ? 'text-[var(--badge-error-text)]' : ''}>
-                      {getPriorityLabel(data.priority)}
+                      {getPriorityLabel(isEditMode ? (editedData.priority || data.priority) : data.priority)}
                     </span>
                   </>
                 )}
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] transition-all duration-200 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
-              aria-label="关闭详情"
-              title="关闭 (Esc)"
-            >
-              <Icon name="close" size={18} />
-            </button>
+            <div className="flex items-center space-x-2">
+              {/* 编辑模式按钮（仅任务类型） */}
+              {data.type === 'task' && !isEditMode && (
+                <button
+                  onClick={handleEnterEditMode}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg flex items-center space-x-1.5 text-xs font-medium text-[var(--color-primary)] bg-[var(--color-primary-soft)] hover:bg-[var(--color-primary)] hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
+                  aria-label="进入编辑模式"
+                  title="编辑任务"
+                >
+                  <Icon name="edit" size={14} />
+                  <span>编辑</span>
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)] transition-all duration-200 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-inset"
+                aria-label="关闭详情"
+                title="关闭 (Esc)"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
           </div>
 
           {/* 标签页导航 */}
@@ -475,16 +572,110 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
 
                 {/* 主要信息字段 */}
                 <div className="space-y-1">
-                  {data.owner && (
-                    <DetailField label="负责人" icon="owner">
-                      <span className="text-sm text-[var(--text-primary)]">{data.owner}</span>
+                  {/* 状态字段（可编辑） */}
+                  {isEditMode ? (
+                    <DetailField label="状态" icon="status">
+                      <select
+                        value={editedData.status || data.status || 'todo'}
+                        onChange={(e) => handleFieldChange('status', e.target.value)}
+                        className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      >
+                        <option value="todo">待办 (todo)</option>
+                        <option value="in_progress">进行中 (in_progress)</option>
+                        <option value="blocked">已阻塞 (blocked)</option>
+                        <option value="done">已完成 (done)</option>
+                      </select>
                     </DetailField>
+                  ) : (
+                    data.status && (
+                      <DetailField label="状态" icon="status">
+                        <StatusBadge status={data.status} size="sm" />
+                      </DetailField>
+                    )
                   )}
 
-                  {data.dueAt && (
-                    <DetailField label="截止时间" icon="calendar">
-                      <span className="text-sm text-[var(--text-primary)]">{formatDate(data.dueAt)}</span>
+                  {/* 负责人字段（可编辑） */}
+                  {isEditMode ? (
+                    <DetailField label="负责人" icon="owner">
+                      <input
+                        type="text"
+                        value={editedData.owner ?? data.owner ?? ''}
+                        onChange={(e) => handleFieldChange('owner', e.target.value)}
+                        placeholder="输入负责人姓名"
+                        className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 w-full max-w-[200px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
                     </DetailField>
+                  ) : (
+                    data.owner && (
+                      <DetailField label="负责人" icon="owner">
+                        <span className="text-sm text-[var(--text-primary)]">{data.owner}</span>
+                      </DetailField>
+                    )
+                  )}
+
+                  {/* 优先级字段（可编辑） */}
+                  {isEditMode ? (
+                    <DetailField label="优先级" icon="priority">
+                      <select
+                        value={editedData.priority ?? data.priority ?? 'none'}
+                        onChange={(e) => handleFieldChange('priority', e.target.value)}
+                        className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      >
+                        <option value="P0">P0 - 紧急</option>
+                        <option value="P1">P1 - 高</option>
+                        <option value="P2">P2 - 中</option>
+                        <option value="none">无优先级</option>
+                      </select>
+                    </DetailField>
+                  ) : (
+                    data.priority && (
+                      <DetailField label="优先级" icon="priority">
+                        <span className={`text-sm ${data.priority === 'high' || data.priority === 'P0' ? 'text-[var(--badge-error-text)] font-medium' : data.priority === 'P1' ? 'text-[var(--badge-warning-text)]' : 'text-[var(--text-primary)]'}`}>
+                          {getPriorityLabel(data.priority)}
+                        </span>
+                      </DetailField>
+                    )
+                  )}
+
+                  {/* 下一步行动字段（可编辑） */}
+                  {isEditMode ? (
+                    <div className="py-3 border-b border-[var(--border-light)] dark:border-[var(--border-medium)]">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Icon name="action" size={16} className="text-[var(--text-muted)]" />
+                        <span className="text-sm text-[var(--text-muted)]">下一步行动</span>
+                      </div>
+                      <textarea
+                        value={editedData.nextAction ?? data.nextAction ?? ''}
+                        onChange={(e) => handleFieldChange('nextAction', e.target.value)}
+                        placeholder="输入下一步行动"
+                        rows={3}
+                        className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+                      />
+                    </div>
+                  ) : (
+                    data.nextAction && (
+                      <DetailField label="下一步行动" icon="action">
+                        <p className="text-sm text-[var(--text-primary)]">{data.nextAction}</p>
+                      </DetailField>
+                    )
+                  )}
+
+                  {/* 截止日期字段（可编辑） */}
+                  {isEditMode ? (
+                    <DetailField label="截止日期" icon="calendar">
+                      <input
+                        type="date"
+                        value={editedData.dueAt ? new Date(editedData.dueAt).toISOString().split('T')[0] : (data.dueAt ? new Date(data.dueAt).toISOString().split('T')[0] : '')}
+                        onChange={(e) => handleFieldChange('dueAt', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                        className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
+                    </DetailField>
+                  ) : (
+                    data.dueAt && (
+                      <DetailField label="截止时间" icon="calendar">
+                        <span className="text-sm text-[var(--text-primary)]">{formatDate(data.dueAt)}</span>
+                      </DetailField>
+                    )
                   )}
 
                   {data.startsAt && (
@@ -523,13 +714,7 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
                     </DetailField>
                   )}
 
-                  {data.nextAction && (
-                    <DetailField label="下一步行动" icon="action">
-                      <p className="text-sm text-[var(--text-primary)]">{data.nextAction}</p>
-                    </DetailField>
-                  )}
-
-                  {data.description && (
+                  {!isEditMode && data.description && (
                     <div className="py-3 border-b border-[var(--border-light)] dark:border-[var(--border-medium)]">
                       <div className="flex items-center space-x-2 mb-2">
                         <Icon name="note" size={16} className="text-[var(--text-muted)]" />
@@ -539,7 +724,7 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
                     </div>
                   )}
 
-                  {data.notes && (
+                  {!isEditMode && data.notes && (
                     <div className="py-3 border-b border-[var(--border-light)] dark:border-[var(--border-medium)]">
                       <div className="flex items-center space-x-2 mb-2">
                         <Icon name="note" size={16} className="text-[var(--text-muted)]" />
@@ -549,14 +734,14 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
                     </div>
                   )}
 
-                  {data.source && (
+                  {!isEditMode && data.source && (
                     <DetailField label="来源" icon="source">
                       <span className="text-sm text-[var(--text-primary)]">{data.source}</span>
                     </DetailField>
                   )}
 
                   {/* 元信息标签 */}
-                  {data.metadata?.tags && data.metadata.tags.length > 0 && (
+                  {!isEditMode && data.metadata?.tags && data.metadata.tags.length > 0 && (
                     <div className="py-3 border-b border-[var(--border-light)] dark:border-[var(--border-medium)]">
                       <div className="flex items-center space-x-2 mb-2 ml-6">
                         <Icon name="tag" size={16} className="text-[var(--text-muted)]" />
@@ -617,20 +802,58 @@ export function DetailModal({ isOpen, onClose, data }: DetailModalProps) {
 
           {/* 底部操作栏 */}
           <div className="p-4 border-t border-[var(--border-light)] dark:border-[var(--border-medium)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] flex items-center justify-between">
-            <div className="text-xs text-[var(--text-muted)]">
-              {data.metadata?.createdUser && (
-                <span>创建：{data.metadata.createdUser} · </span>
-              )}
-              {data.metadata?.updatedUser && (
-                <span>更新：{data.metadata.updatedUser}</span>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              className="py-2.5 px-6 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg font-medium transition-colors"
-            >
-              关闭
-            </button>
+            {isEditMode ? (
+              <>
+                <div className="flex items-center space-x-3">
+                  {saveError && (
+                    <span className="text-xs text-[var(--badge-error-text)]">{saveError}</span>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleExitEditMode}
+                    disabled={isSaving}
+                    className="py-2.5 px-5 bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] rounded-lg font-medium transition-colors disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="py-2.5 px-6 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Icon name="refresh" size={16} className="animate-spin" />
+                        <span>保存中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="check" size={16} />
+                        <span>保存</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs text-[var(--text-muted)]">
+                  {data.metadata?.createdUser && (
+                    <span>创建：{data.metadata.createdUser} · </span>
+                  )}
+                  {data.metadata?.updatedUser && (
+                    <span>更新：{data.metadata.updatedUser}</span>
+                  )}
+                </div>
+                <button
+                  onClick={onClose}
+                  className="py-2.5 px-6 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg font-medium transition-colors"
+                >
+                  关闭
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
