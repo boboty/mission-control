@@ -193,10 +193,93 @@ const EVENT_VIEW_OPTIONS = [
 ];
 
 // ============ 数据转换函数 ============
-function taskToDetail(task: Task): DetailData {
-  const timeline: any[] = [];
+// 将事件类型映射到显示文本
+function getEventDisplayInfo(eventType: string, oldValue: string | null, newValue: string) {
+  switch (eventType) {
+    case 'created':
+      return { title: '任务创建', description: '任务已创建', icon: 'clock' as const };
+    case 'status_change':
+      return { 
+        title: '状态变更', 
+        description: `从 "${getStatusLabel(oldValue)}" 改为 "${getStatusLabel(newValue)}"`,
+        icon: 'status' as const 
+      };
+    case 'owner_change':
+      return { 
+        title: '负责人变更', 
+        description: `从 "${oldValue || '未分配'}" 改为 "${newValue || '未分配'}"`,
+        icon: 'owner' as const 
+      };
+    case 'priority_change':
+      return { 
+        title: '优先级变更', 
+        description: `从 "${getPriorityLabel(oldValue || 'none')}" 改为 "${getPriorityLabel(newValue)}"`,
+        icon: 'priority' as const 
+      };
+    case 'due_date_change':
+      return { 
+        title: '截止日期变更', 
+        description: `截止日期已更新`,
+        icon: 'calendar' as const 
+      };
+    case 'next_action_change':
+      return { 
+        title: '下一步行动更新', 
+        description: '下一步行动已更新',
+        icon: 'action' as const 
+      };
+    case 'comment':
+      return { 
+        title: '评论', 
+        description: newValue,
+        icon: 'note' as const 
+      };
+    default:
+      return { title: '更新', description: newValue, icon: 'clock' as const };
+  }
+}
+
+function getStatusLabel(status: string | null): string {
+  if (!status) return '未知';
+  const labels: Record<string, string> = {
+    todo: '待办',
+    in_progress: '进行中',
+    blocked: '已阻塞',
+    done: '已完成',
+  };
+  return labels[status] || status;
+}
+
+async function loadTaskTimeline(taskId: number): Promise<any[]> {
+  try {
+    const res = await fetch(`/api/tasks?taskId=${taskId}&timeline=true`);
+    const data = await res.json();
+    if (data.success && data.events) {
+      return data.events.map((event: any) => {
+        const displayInfo = getEventDisplayInfo(event.event_type, event.old_value, event.new_value);
+        return {
+          timestamp: event.created_at,
+          type: event.event_type === 'comment' ? 'comment' : 'updated' as const,
+          title: displayInfo.title,
+          description: event.comment || displayInfo.description,
+          icon: displayInfo.icon,
+          metadata: {
+            actor: event.actor,
+            event_type: event.event_type,
+          },
+        };
+      });
+    }
+  } catch (error) {
+    console.error('Failed to load task timeline:', error);
+  }
+  return [];
+}
+
+function taskToDetail(task: Task, timeline?: any[]): DetailData {
+  const taskTimeline: any[] = timeline || [];
   if (task.due_at) {
-    timeline.push({
+    taskTimeline.push({
       timestamp: task.due_at,
       type: 'custom' as const,
       title: '截止日期',
@@ -204,13 +287,6 @@ function taskToDetail(task: Task): DetailData {
       icon: 'calendar',
     });
   }
-  timeline.push({
-    timestamp: task.updated_at || new Date().toISOString(),
-    type: 'updated' as const,
-    title: '任务更新',
-    description: `状态：${task.status}`,
-    icon: 'clock',
-  });
   
   const relatedObjects: any[] = [];
   if (task.blocker) {
@@ -242,7 +318,7 @@ function taskToDetail(task: Task): DetailData {
       updatedUser: task.owner || '系统',
       tags: task.priority === 'high' ? ['高优', '重点关注'] : [],
     },
-    timeline: timeline.length > 0 ? timeline : undefined,
+    timeline: taskTimeline.length > 0 ? taskTimeline : undefined,
     relatedObjects: relatedObjects.length > 0 ? relatedObjects : undefined,
   };
 }
@@ -856,7 +932,12 @@ export default function Dashboard() {
   const filteredAlerts = alerts.filter(a => !dismissedAlerts.includes(a.id));
 
   // 打开详情浮窗
-  const openDetail = (data: DetailData) => {
+  const openDetail = async (data: DetailData) => {
+    // 如果是任务类型，加载时间线
+    if (data.type === 'task' && !data.timeline) {
+      const timeline = await loadTaskTimeline(Number(data.id));
+      data.timeline = timeline.length > 0 ? timeline : undefined;
+    }
     setSelectedItem(data);
     setDetailOpen(true);
   };

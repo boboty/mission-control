@@ -2,6 +2,24 @@ import { NextResponse } from 'next/server';
 import { getPgPool } from '../_lib/pg';
 import { buildMeta, buildPagination, withLegacyListShape } from '../_lib/response';
 
+// 记录任务变更事件
+async function recordTaskEvent(
+  pool: any,
+  taskId: number,
+  eventType: string,
+  oldValue: string | null,
+  newValue: string,
+  actor: string,
+  comment?: string | null,
+  meta?: Record<string, any>
+) {
+  await pool.query(
+    `INSERT INTO task_events (task_id, event_type, old_value, new_value, actor, comment, meta, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+    [taskId, eventType, oldValue, newValue, actor, comment, meta ? JSON.stringify(meta) : null]
+  );
+}
+
 export async function PATCH(request: Request) {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -9,7 +27,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { taskId, status, priority, owner, nextAction, dueAt, actor = 'system', meta } = body;
+  const { taskId, status, priority, owner, nextAction, dueAt, actor = 'system', meta, comment } = body;
 
   if (!taskId) {
     return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
@@ -30,7 +48,6 @@ export async function PATCH(request: Request) {
     }
 
     const oldTask = taskResult.rows[0];
-    const fromStatus = oldTask.status;
 
     // Build update query dynamically based on provided fields
     const updates: string[] = [];
@@ -81,12 +98,83 @@ export async function PATCH(request: Request) {
 
     await pool.query(updateQuery, values);
 
-    // Insert event record if status changed
-    if (status !== undefined && status !== fromStatus) {
-      await pool.query(
-        `INSERT INTO task_events (task_id, event_type, from_status, to_status, actor, meta, created_at)
-         VALUES ($1, 'status_change', $2, $3, $4, $5, NOW())`,
-        [taskId, fromStatus, status, actor, meta ? JSON.stringify(meta) : null]
+    // Record events for each changed field
+    if (status !== undefined && status !== oldTask.status) {
+      await recordTaskEvent(
+        pool,
+        taskId,
+        'status_change',
+        oldTask.status,
+        status,
+        actor,
+        null,
+        meta
+      );
+    }
+
+    if (priority !== undefined && priority !== oldTask.priority) {
+      await recordTaskEvent(
+        pool,
+        taskId,
+        'priority_change',
+        oldTask.priority || 'none',
+        priority,
+        actor,
+        null,
+        meta
+      );
+    }
+
+    if (owner !== undefined && owner !== oldTask.owner) {
+      await recordTaskEvent(
+        pool,
+        taskId,
+        'owner_change',
+        oldTask.owner || 'unassigned',
+        owner || 'unassigned',
+        actor,
+        null,
+        meta
+      );
+    }
+
+    if (nextAction !== undefined && nextAction !== oldTask.next_action) {
+      await recordTaskEvent(
+        pool,
+        taskId,
+        'next_action_change',
+        oldTask.next_action,
+        nextAction,
+        actor,
+        null,
+        meta
+      );
+    }
+
+    if (dueAt !== undefined && dueAt !== oldTask.due_at) {
+      await recordTaskEvent(
+        pool,
+        taskId,
+        'due_date_change',
+        oldTask.due_at,
+        dueAt,
+        actor,
+        null,
+        meta
+      );
+    }
+
+    // Add comment if provided
+    if (comment) {
+      await recordTaskEvent(
+        pool,
+        taskId,
+        'comment',
+        null,
+        'comment',
+        actor,
+        comment,
+        meta
       );
     }
 
@@ -95,8 +183,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({
       success: true,
       taskId,
-      fromStatus,
-      toStatus: status || fromStatus,
       updated: {
         status,
         priority,
@@ -115,6 +201,7 @@ export async function PATCH(request: Request) {
   }
 }
 
+// GET endpoint to fetch task timeline
 export async function GET(request: Request) {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -122,21 +209,51 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
-  const status = searchParams.get('status');
-  const search = searchParams.get('search');
-  const sortBy = searchParams.get('sortBy') || 'default';
-
-  const safePage = Math.max(1, page);
-  const safePageSize = Math.min(100, Math.max(1, pageSize));
-  const offset = (safePage - 1) * safePageSize;
+  const taskId = searchParams.get('taskId');
+  const timeline = searchParams.get('timeline');
 
   const pool = getPgPool(databaseUrl);
 
   try {
-    // pool is lazy; no explicit connect
+    // If requesting timeline for a specific task
+    if (taskId && timeline === 'true') {
+      const result = await pool.query(
+        `SELECT id, task_id, event_type, old_value, new_value, actor, comment, meta, created_at
+         FROM task_events
+         WHERE task_id = $1
+         ORDER BY created_at DESC`,
+        [taskId]
+      );
 
+      return NextResponse.json({
+        success: true,
+        taskId,
+        events: result.rows.map(row => ({
+          id: row.id,
+          task_id: row.task_id,
+          event_type: row.event_type,
+          old_value: row.old_value,
+          new_value: row.new_value,
+          actor: row.actor,
+          comment: row.comment,
+          meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
+          created_at: row.created_at,
+        })),
+      });
+    }
+
+    // Default: return tasks list (existing behavior)
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
+    const status = searchParams.get('status');
+    const search = searchParams.get('search');
+    const sortBy = searchParams.get('sortBy') || 'default';
+
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.min(100, Math.max(1, pageSize));
+    const offset = (safePage - 1) * safePageSize;
+
+    // pool is lazy; no explicit connect
 
     const whereClauses: string[] = [];
     const queryParams: any[] = [];
@@ -236,3 +353,5 @@ export async function GET(request: Request) {
 
   }
 }
+
+

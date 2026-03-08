@@ -143,21 +143,102 @@ function copyToClipboard(text: string): boolean {
 // ============ 子组件：时间线 ============
 interface TimelineProps {
   events: TimelineEvent[];
+  onAddComment?: () => void;
+  isAddingComment?: boolean;
+  commentText?: string;
+  onCommentChange?: (text: string) => void;
+  onSubmitComment?: () => void;
+  onCancelComment?: () => void;
+  isSaving?: boolean;
 }
 
-function Timeline({ events }: TimelineProps) {
-  if (!events || events.length === 0) return null;
+function Timeline({ 
+  events, 
+  onAddComment,
+  isAddingComment,
+  commentText,
+  onCommentChange,
+  onSubmitComment,
+  onCancelComment,
+  isSaving 
+}: TimelineProps) {
+  if (!events || events.length === 0) {
+    return (
+      <div className="mt-4">
+        <div className="text-center text-sm text-[var(--text-muted)] py-8">
+          <Icon name="clock" size={32} className="mx-auto mb-2 opacity-50" />
+          <p>暂无时间线记录</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="mt-4">
-      <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">
-        时间线
-      </h4>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+          时间线
+        </h4>
+        {onAddComment && !isAddingComment && (
+          <button
+            onClick={onAddComment}
+            className="text-xs px-3 py-1.5 rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors flex items-center space-x-1"
+          >
+            <Icon name="note" size={14} />
+            <span>添加评论</span>
+          </button>
+        )}
+      </div>
+      
+      {/* 评论输入框 */}
+      {isAddingComment && (
+        <div className="mb-4 p-3 bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-lg border border-[var(--border-light)] dark:border-[var(--border-medium)]">
+          <textarea
+            value={commentText}
+            onChange={(e) => onCommentChange?.(e.target.value)}
+            placeholder="写下你的评论..."
+            rows={3}
+            className="w-full text-sm text-[var(--text-primary)] bg-transparent border-none focus:outline-none focus:ring-0 resize-none"
+            autoFocus
+          />
+          <div className="flex items-center justify-end space-x-2 mt-2">
+            <button
+              onClick={onCancelComment}
+              disabled={isSaving}
+              className="text-xs px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              onClick={onSubmitComment}
+              disabled={isSaving || !commentText.trim()}
+              className="text-xs px-3 py-1.5 rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 flex items-center space-x-1"
+            >
+              {isSaving ? (
+                <>
+                  <Icon name="refresh" size={12} className="animate-spin" />
+                  <span>发布...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="check" size={12} />
+                  <span>发布</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="space-y-3">
         {events.map((event, index) => (
           <div key={index} className="flex items-start space-x-3">
             <div className="flex-shrink-0 mt-0.5">
-              <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] ring-4 ring-[var(--color-primary)]/10" />
+              <div className={`w-2 h-2 rounded-full ring-4 ${
+                event.type === 'comment' 
+                  ? 'bg-[var(--color-secondary)] ring-[var(--color-secondary)]/10'
+                  : 'bg-[var(--color-primary)] ring-[var(--color-primary)]/10'
+              }`} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
@@ -165,15 +246,26 @@ function Timeline({ events }: TimelineProps) {
                 <span className="text-xs text-[var(--text-muted)]">{formatTime(event.timestamp)}</span>
               </div>
               {event.description && (
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{event.description}</p>
+                <p className={`text-xs mt-0.5 ${
+                  event.type === 'comment' 
+                    ? 'text-[var(--text-primary)] bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] p-2 rounded-lg'
+                    : 'text-[var(--text-secondary)]'
+                }`}>
+                  {event.description}
+                </p>
               )}
               {event.metadata && Object.keys(event.metadata).length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {Object.entries(event.metadata).map(([key, value]) => (
-                    <span key={key} className="text-xs bg-[var(--bg-tertiary)] px-2 py-0.5 rounded text-[var(--text-muted)]">
-                      {key}: {String(value)}
+                  {event.metadata.actor && (
+                    <span className="text-xs bg-[var(--bg-tertiary)] px-2 py-0.5 rounded text-[var(--text-muted)]">
+                      操作者：{event.metadata.actor}
                     </span>
-                  ))}
+                  )}
+                  {event.metadata.event_type && event.metadata.event_type !== 'comment' && (
+                    <span className="text-xs bg-[var(--bg-tertiary)] px-2 py-0.5 rounded text-[var(--text-muted)]">
+                      类型：{event.metadata.event_type}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -278,6 +370,9 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
   const [editedData, setEditedData] = useState<Partial<DetailData>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [isAddingComment, setIsAddingComment] = useState(false);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
 
   // 键盘事件处理
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -306,8 +401,75 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
       setIsEditMode(false);
       setEditedData({});
       setSaveError(null);
+      setCommentText('');
+      setIsAddingComment(false);
+      // 加载时间线
+      if (data?.type === 'task' && data.id) {
+        loadTimeline(Number(data.id));
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, data]);
+
+  // 加载时间线
+  const loadTimeline = async (taskId: number) => {
+    try {
+      const res = await fetch(`/api/tasks?taskId=${taskId}&timeline=true`);
+      const result = await res.json();
+      if (result.success && result.events) {
+        const events: TimelineEvent[] = result.events.map((event: any) => {
+          const displayInfo = getEventDisplayInfo(event.event_type, event.old_value, event.new_value);
+          return {
+            timestamp: event.created_at,
+            type: event.event_type === 'comment' ? 'comment' : 'updated' as const,
+            title: displayInfo.title,
+            description: event.comment || displayInfo.description,
+            icon: displayInfo.icon,
+            metadata: {
+              actor: event.actor,
+              event_type: event.event_type,
+            },
+          };
+        });
+        setTimeline(events);
+      }
+    } catch (error) {
+      console.error('Failed to load timeline:', error);
+      setTimeline([]);
+    }
+  };
+
+  // 添加评论
+  const handleAddComment = async () => {
+    if (!data || data.type !== 'task' || !commentText.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: data.id,
+          comment: commentText.trim(),
+          actor: 'user',
+          meta: { type: 'comment' },
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('添加评论失败');
+      }
+      
+      // 重新加载时间线
+      await loadTimeline(Number(data.id));
+      setCommentText('');
+      setIsAddingComment(false);
+      onTaskUpdated?.();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '添加评论失败');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // 进入编辑模式
   const handleEnterEditMode = () => {
@@ -400,7 +562,8 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
 
   if (!isOpen || !data) return null;
 
-  const hasTimeline = data.timeline && data.timeline.length > 0;
+  // 任务类型始终显示时间线标签页（可以添加评论）
+  const hasTimeline = (data.timeline && data.timeline.length > 0) || data.type === 'task';
   const hasRelated = data.relatedObjects && data.relatedObjects.length > 0;
   const hasActions = data.actions && data.actions.length > 0;
   const hasCustomActions = hasActions || data.type === 'task';
@@ -506,7 +669,7 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
                       : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] dark:hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
-                  时间线 {data.timeline?.length ? `(${data.timeline.length})` : ''}
+                  时间线 {timeline.length > 0 ? `(${timeline.length})` : data.type === 'task' ? '' : ''}
                 </button>
               )}
               {hasRelated && (
@@ -791,8 +954,20 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated }: DetailModa
               </>
             )}
 
-            {activeTab === 'timeline' && hasTimeline && (
-              <Timeline events={data.timeline!} />
+            {activeTab === 'timeline' && (
+              <Timeline 
+                events={timeline.length > 0 ? timeline : (data.timeline || [])}
+                onAddComment={data?.type === 'task' ? () => setIsAddingComment(true) : undefined}
+                isAddingComment={isAddingComment}
+                commentText={commentText}
+                onCommentChange={setCommentText}
+                onSubmitComment={handleAddComment}
+                onCancelComment={() => {
+                  setIsAddingComment(false);
+                  setCommentText('');
+                }}
+                isSaving={isSaving}
+              />
             )}
 
             {activeTab === 'related' && hasRelated && (
@@ -898,8 +1073,68 @@ function getPriorityLabel(priority: string): string {
     high: '高',
     medium: '中',
     low: '低',
+    P0: 'P0 - 紧急',
+    P1: 'P1 - 高',
+    P2: 'P2 - 中',
+    none: '无优先级',
   };
   return labels[priority] || priority;
+}
+
+function getStatusLabel(status: string | null): string {
+  if (!status) return '未知';
+  const labels: Record<string, string> = {
+    todo: '待办',
+    in_progress: '进行中',
+    blocked: '已阻塞',
+    done: '已完成',
+  };
+  return labels[status] || status;
+}
+
+function getEventDisplayInfo(eventType: string, oldValue: string | null, newValue: string) {
+  switch (eventType) {
+    case 'created':
+      return { title: '任务创建', description: '任务已创建', icon: 'clock' as const };
+    case 'status_change':
+      return { 
+        title: '状态变更', 
+        description: `从 "${getStatusLabel(oldValue)}" 改为 "${getStatusLabel(newValue)}"`,
+        icon: 'status' as const 
+      };
+    case 'owner_change':
+      return { 
+        title: '负责人变更', 
+        description: `从 "${oldValue || '未分配'}" 改为 "${newValue || '未分配'}"`,
+        icon: 'owner' as const 
+      };
+    case 'priority_change':
+      return { 
+        title: '优先级变更', 
+        description: `从 "${getPriorityLabel(oldValue || 'none')}" 改为 "${getPriorityLabel(newValue)}"`,
+        icon: 'priority' as const 
+      };
+    case 'due_date_change':
+      return { 
+        title: '截止日期变更', 
+        description: `截止日期已更新`,
+        icon: 'calendar' as const 
+      };
+    case 'next_action_change':
+      return { 
+        title: '下一步行动更新', 
+        description: '下一步行动已更新',
+        icon: 'action' as const 
+      };
+    case 'comment':
+      return { 
+        title: '评论', 
+        description: newValue,
+        icon: 'note' as const 
+      };
+    default:
+      return { title: '更新', description: newValue, icon: 'clock' as const };
+  }
 }
 
 function formatFieldLabel(key: string): string {

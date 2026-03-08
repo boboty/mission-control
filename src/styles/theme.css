@@ -1,0 +1,201 @@
+/* ========== 主题切换系统 - 支持浅色/深色/系统自动 ========== */
+/* 使用 data-theme 属性控制主题：'light' | 'dark' | 'system' */
+
+/* 默认主题变量（浅色） */
+:root {
+  --theme-mode: 'light';
+}
+
+/* 浅色主题 */
+[data-theme="light"] {
+  /* 主色调 */
+  --color-primary: #2563eb;
+  --color-primary-soft: #dbeafe;
+  --color-primary-hover: #1d4ed8;
+  --color-accent: #7c3aed;
+  --color-accent-soft: #ede9fe;
+  
+  /* 状态色 */
+  --color-success: #059669;
+  --color-success-soft: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-info: #0891b2;
+  --color-info-soft: #cffafe;
+  
+  /* 背景色 */
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f8fafc;
+  --bg-elevated: #ffffff;
+  
+  /* 边框 */
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --border-dark: #94a3b8;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.06);
+  
+  /* 文字颜色 */
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #475569;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+  
+  /* 徽标/标签 */
+  --badge-success-bg: #d1fae5;
+  --badge-success-text: #065f46;
+  --badge-warning-bg: #fef3c7;
+  --badge-warning-text: #92400e;
+  --badge-error-bg: #fee2e2;
+  --badge-error-text: #991b1b;
+  --badge-info-bg: #cffafe;
+  --badge-info-text: #0e7490;
+  --badge-slate-bg: #f1f5f9;
+  --badge-slate-text: #475569;
+  
+  /* 输入框 */
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-border-focus: #3b82f6;
+  --input-placeholder: #94a3b8;
+}
+
+/* 深色主题 */
+[data-theme="dark"] {
+  /* 主色调 */
+  --color-primary: #3b82f6;
+  --color-primary-soft: #1e3a5f;
+  --color-primary-hover: #60a5fa;
+  --color-accent: #8b5cf6;
+  --color-accent-soft: #2e1065;
+  
+  /* 状态色 */
+  --color-success: #10b981;
+  --color-success-soft: #064e3b;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #78350f;
+  --color-danger: #ef4444;
+  --color-danger-soft: #7f1d1d;
+  --color-info: #06b6d4;
+  --color-info-soft: #164e63;
+  
+  /* 背景色 */
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
+  --bg-elevated: #1e293b;
+  
+  /* 边框 */
+  --border-light: #1e293b;
+  --border-medium: #334155;
+  --border-dark: #475569;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+  
+  /* 文字颜色 */
+  --text-primary: #f8fafc;
+  --text-secondary: #e2e8f0;
+  --text-tertiary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #0f172a;
+  
+  /* 徽标/标签 */
+  --badge-success-bg: #064e3b;
+  --badge-success-text: #6ee7b7;
+  --badge-warning-bg: #78350f;
+  --badge-warning-text: #fcd34d;
+  --badge-error-bg: #7f1d1d;
+  --badge-error-text: #fca5a5;
+  --badge-info-bg: #164e63;
+  --badge-info-text: #67e8f9;
+  --badge-slate-bg: #1e293b;
+  --badge-slate-text: #cbd5e1;
+  
+  /* 输入框 */
+  --input-bg: #1e293b;
+  --input-border: #334155;
+  --input-border-focus: #3b82f6;
+  --input-placeholder: #64748b;
+}
+
+/* 系统自动模式 - 跟随系统偏好 */
+[data-theme="system"] {
+  /* 默认使用浅色 */
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    /* 深色主题变量 */
+    --color-primary: #3b82f6;
+    --color-primary-soft: #1e3a5f;
+    --color-primary-hover: #60a5fa;
+    --color-accent: #8b5cf6;
+    --color-accent-soft: #2e1065;
+    
+    --color-success: #10b981;
+    --color-success-soft: #064e3b;
+    --color-warning: #f59e0b;
+    --color-warning-soft: #78350f;
+    --color-danger: #ef4444;
+    --color-danger-soft: #7f1d1d;
+    --color-info: #06b6d4;
+    --color-info-soft: #164e63;
+    
+    --bg-primary: #020617;
+    --bg-secondary: #0f172a;
+    --bg-tertiary: #1e293b;
+    --bg-elevated: #1e293b;
+    
+    --border-light: #1e293b;
+    --border-medium: #334155;
+    --border-dark: #475569;
+    
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+    
+    --text-primary: #f8fafc;
+    --text-secondary: #e2e8f0;
+    --text-tertiary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-inverse: #0f172a;
+    
+    --badge-success-bg: #064e3b;
+    --badge-success-text: #6ee7b7;
+    --badge-warning-bg: #78350f;
+    --badge-warning-text: #fcd34d;
+    --badge-error-bg: #7f1d1d;
+    --badge-error-text: #fca5a5;
+    --badge-info-bg: #164e63;
+    --badge-info-text: #67e8f9;
+    --badge-slate-bg: #1e293b;
+    --badge-slate-text: #cbd5e1;
+    
+    --input-bg: #1e293b;
+    --input-border: #334155;
+    --input-border-focus: #3b82f6;
+    --input-placeholder: #64748b;
+  }
+}
+
+/* 主题切换平滑过渡 */
+[data-theme] {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+[data-theme] * {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}

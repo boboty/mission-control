@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { useTheme, type ThemeMode } from '@/lib/useTheme';
 
 interface NavItem {
   key: string;
@@ -38,6 +39,7 @@ export function LeftNav({
   mobileOpen = false,
   onMobileClose
 }: LeftNavProps) {
+  const { theme, setTheme, resolvedTheme, toggleTheme } = useTheme();
   const [blockedCount, setBlockedCount] = useState<number>(0);
   const [clientTime, setClientTime] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
@@ -156,15 +158,68 @@ export function LeftNav({
         ))}
       </nav>
 
-      {/* 底部：系统状态 */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[var(--border-light)] dark:border-[var(--border-medium)]">
-        <div className="flex items-center space-x-2 text-xs text-[var(--text-muted)]">
-          <span className="w-2 h-2 bg-[var(--color-success)] rounded-full" />
-          <span>系统正常</span>
+      {/* 底部：主题切换 + 系统状态 */}
+      <div className="absolute bottom-0 left-0 right-0 border-t border-[var(--border-light)] dark:border-[var(--border-medium)]">
+        {/* 主题切换按钮 */}
+        <div className="p-3">
+          <div className="flex items-center justify-between bg-[var(--bg-tertiary)] dark:bg-[var(--bg-elevated)] rounded-xl p-1">
+            <button
+              onClick={() => setTheme('light')}
+              className={`flex-1 flex items-center justify-center py-2 px-2 rounded-lg transition-all duration-200 ${
+                theme === 'light'
+                  ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--color-primary)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+              title="浅色模式"
+              aria-label="切换到浅色模式"
+            >
+              <Icon name="sun" size={18} />
+            </button>
+            <button
+              onClick={() => setTheme('system')}
+              className={`flex-1 flex items-center justify-center py-2 px-2 rounded-lg transition-all duration-200 ${
+                theme === 'system'
+                  ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--color-primary)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+              title="跟随系统"
+              aria-label="跟随系统主题"
+            >
+              <Icon name="monitor" size={18} />
+            </button>
+            <button
+              onClick={() => setTheme('dark')}
+              className={`flex-1 flex items-center justify-center py-2 px-2 rounded-lg transition-all duration-200 ${
+                theme === 'dark'
+                  ? 'bg-[var(--bg-secondary)] dark:bg-[var(--bg-tertiary)] text-[var(--color-primary)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+              title="深色模式"
+              aria-label="切换到深色模式"
+            >
+              <Icon name="moon" size={18} />
+            </button>
+          </div>
+          {/* 主题提示文字 */}
+          <p className="text-[10px] text-[var(--text-muted)] text-center mt-1.5">
+            {theme === 'system' 
+              ? `跟随系统 (${resolvedTheme === 'dark' ? '深色' : '浅色'})` 
+              : theme === 'dark' 
+                ? '深色模式' 
+                : '浅色模式'}
+          </p>
         </div>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          更新于 {clientTime || '—'}
-        </p>
+        
+        {/* 系统状态 */}
+        <div className="px-4 pb-4">
+          <div className="flex items-center space-x-2 text-xs text-[var(--text-muted)]">
+            <span className="w-2 h-2 bg-[var(--color-success)] rounded-full" />
+            <span>系统正常</span>
+          </div>
+          <p className="text-xs text-[var(--text-muted)] mt-1">
+            更新于 {clientTime || '—'}
+          </p>
+        </div>
       </div>
     </>
   );

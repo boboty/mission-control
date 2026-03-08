@@ -7,7 +7,7 @@ import {
   Info, Search, Plus, X, RefreshCw, Copy, ChevronLeft, 
   ChevronRight, ArrowLeft, ArrowRight, ArrowUp, ArrowDown,
   Loader2, Edit3, Trash2, Clock, Link, Tag, FileText,
-  Check, Inbox, Zap, AlertCircle
+  Check, Inbox, Zap, AlertCircle, Sun, Moon, Monitor
 } from 'lucide-react';
 
 // 图标名称映射 (name -> lucide-react 组件)
@@ -72,6 +72,11 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'source': Link,
   'tag': Tag,
   'link': Link,
+  
+  // 主题切换图标
+  'sun': Sun,
+  'moon': Moon,
+  'monitor': Monitor,
 };
 
 export interface IconProps {
