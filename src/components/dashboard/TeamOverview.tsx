@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ClickableItem, EmptyState, StatusBadge, type DetailData } from '@/components';
-import { agentToDetail, formatDate } from '@/lib/data-utils';
+import { agentToDetail } from '@/lib/data-utils';
 import { type Agent } from '@/lib/types';
-import { formatFreshnessLabel, getAgentSummary } from '@/features/dashboard/lib/module-summaries';
+import { buildTeamInsights, type EvidenceSourceType, type FreshnessLevel, type TeamAgentInsight, type TeamSignal } from '@/features/dashboard/lib/team-insights';
 import dynamic from 'next/dynamic';
 
 const OfficeScene = dynamic(() => import('./OfficeScene'), {
@@ -37,21 +37,75 @@ function getPresenceLabel(state: string) {
 }
 
 function getPresenceTone(state: string) {
-  if (isOnline(state)) return 'bg-emerald-500/12 text-emerald-700';
-  if (state === 'idle') return 'bg-amber-500/12 text-amber-700';
-  return 'bg-slate-500/12 text-slate-600';
+  if (isOnline(state)) return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+  if (state === 'idle') return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
+  return 'bg-slate-500/12 text-slate-600 dark:text-slate-300';
 }
 
-function getGroupLabel(agentKey: string) {
-  if (agentKey.includes('content')) return '内容';
-  if (agentKey.includes('design')) return '设计';
-  return '开发';
+function getFreshnessTone(level: FreshnessLevel) {
+  if (level === 'fresh') return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+  if (level === 'recent') return 'bg-blue-500/12 text-blue-700 dark:text-blue-300';
+  if (level === 'stale') return 'bg-rose-500/12 text-rose-700 dark:text-rose-300';
+  return 'bg-slate-500/12 text-slate-600 dark:text-slate-300';
 }
 
-function getAgentSortScore(agent: Agent) {
-  const freshness = agent.last_seen_at ? new Date(agent.last_seen_at).getTime() : 0;
-  const statusPriority = isOnline(agent.state) ? 3 : agent.state === 'idle' ? 2 : 1;
-  return statusPriority * 10_000_000_000_000 + freshness;
+function getSourceTone(source: EvidenceSourceType) {
+  switch (source) {
+    case 'runtime':
+      return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+    case 'file':
+      return 'bg-blue-500/12 text-blue-700 dark:text-blue-300';
+    case 'config':
+      return 'bg-violet-500/12 text-violet-700 dark:text-violet-300';
+    case 'db':
+      return 'bg-fuchsia-500/12 text-fuchsia-700 dark:text-fuchsia-300';
+    case 'derived':
+      return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
+    default:
+      return 'bg-slate-500/12 text-slate-600 dark:text-slate-300';
+  }
+}
+
+function getHealthTone(score: number) {
+  if (score >= 85) return 'text-emerald-600 dark:text-emerald-300';
+  if (score >= 70) return 'text-blue-600 dark:text-blue-300';
+  if (score >= 55) return 'text-amber-600 dark:text-amber-300';
+  return 'text-rose-600 dark:text-rose-300';
+}
+
+function enhanceAgentDetail(insight: TeamAgentInsight) {
+  const base = agentToDetail(insight.agent);
+  const protocolSummary = insight.protocolChecks
+    .map((check) => `${check.present ? '✅' : '⚠️'} ${check.label} · ${check.sourceRef}${check.note ? ` · ${check.note}` : ''}`)
+    .join('\n');
+  const signalSummary = insight.signals.length > 0
+    ? insight.signals.map((signal) => `- [${signal.severity}] ${signal.title}：${signal.description}`).join('\n')
+    : '暂无显著异常';
+  const recommendationSummary = insight.recommendations.length > 0
+    ? insight.recommendations.map((item) => `- ${item}`).join('\n')
+    : '暂无明确建议';
+
+  return {
+    ...base,
+    owner: insight.roleLabel,
+    description: `${insight.summary}\n\n${signalSummary}`,
+    notes: `Protocol Coverage\n${protocolSummary}\n\nRecommendations\n${recommendationSummary}`,
+    extra: {
+      ...base.extra,
+      channel: insight.channelLabel,
+      model: insight.modelLabel,
+      freshness: insight.freshnessLabel,
+      health: insight.health,
+      evidence: {
+        status: insight.statusEvidence,
+        activity: insight.activityEvidence,
+        model: insight.modelEvidence,
+      },
+      signals: insight.signals,
+      recommendations: insight.recommendations,
+      capabilities: insight.capabilityTags,
+    },
+  };
 }
 
 function SummaryCard({
@@ -74,47 +128,130 @@ function SummaryCard({
   );
 }
 
-function AgentItem({ agent, onClick }: { agent: Agent; onClick: () => void }) {
-  const groupLabel = getGroupLabel(agent.agent_key);
-  const online = isOnline(agent.state);
+function AgentItem({ insight, onClick }: { insight: TeamAgentInsight; onClick: () => void }) {
+  const online = isOnline(insight.agent.state);
 
   return (
     <ClickableItem onClick={onClick} className="-mx-2 rounded-xl px-2 group">
-      <div className="mb-2 flex min-h-[48px] items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--surface-primary)]/70 px-3 py-3 transition-all duration-200 last:mb-0 hover:border-[var(--primary)]/40 hover:bg-[var(--surface-secondary)] hover:shadow-sm touch-target">
-        <div className="min-w-0 flex items-center gap-3">
-          <div
-            className="h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 sm:h-12 sm:w-12"
-            style={{ borderColor: online ? '#4ade80' : '#6b7280' }}
-          >
-            <img src={getAvatarUrl(agent.agent_key)} alt={agent.display_name} className="h-full w-full object-cover" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="block truncate text-sm font-medium text-[var(--text-secondary)]">{agent.display_name}</span>
-              <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--border-light)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-                {groupLabel}
-              </span>
-              <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getPresenceTone(agent.state)}`}>
-                {getPresenceLabel(agent.state)}
-              </span>
+      <div className="mb-3 rounded-2xl border border-[var(--border-light)] bg-[var(--surface-primary)]/70 p-4 transition-all duration-200 last:mb-0 hover:border-[var(--primary)]/40 hover:bg-[var(--surface-secondary)] hover:shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex items-start gap-3">
+            <div
+              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2"
+              style={{ borderColor: online ? '#4ade80' : '#6b7280' }}
+            >
+              <img src={getAvatarUrl(insight.agent.agent_key)} alt={insight.agent.display_name} className="h-full w-full object-cover" />
             </div>
-            {agent.description && <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{agent.description}</p>}
-            {agent.last_seen_at && (
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">最近心跳 {formatDate(agent.last_seen_at)}</p>
-            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{insight.agent.display_name}</span>
+                <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                  {insight.agent.agent_key}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getPresenceTone(insight.agent.state)}`}>
+                  {getPresenceLabel(insight.agent.state)}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getFreshnessTone(insight.freshnessLevel)}`}>
+                  {insight.freshnessLabel}
+                </span>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                <span>{insight.roleLabel}</span>
+                <span>·</span>
+                <span>{insight.channelLabel}</span>
+                <span>·</span>
+                <span>{insight.modelLabel}</span>
+              </div>
+
+              <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">{insight.summary}</p>
+            </div>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <div className={`text-2xl font-semibold ${getHealthTone(insight.health.total)}`}>{insight.health.total}</div>
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Health</div>
           </div>
         </div>
-        <div className="shrink-0 [&_span]:rounded-full [&_span]:shadow-sm [&_span]:ring-1 [&_span]:ring-[var(--border-light)]/70">
-          <StatusBadge status={agent.state} size="sm" />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-medium ${getSourceTone(insight.statusEvidence.sourceType)}`}>
+            状态源：{insight.statusEvidence.sourceType}
+          </span>
+          <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-medium ${getSourceTone(insight.modelEvidence.sourceType)}`}>
+            模型源：{insight.modelEvidence.sourceType}
+          </span>
+          {insight.capabilityTags.map((tag) => (
+            <span key={tag} className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Protocol</div>
+            <div className={`mt-1 text-sm font-semibold ${getHealthTone(insight.health.protocol)}`}>{insight.health.protocol}</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Runtime</div>
+            <div className={`mt-1 text-sm font-semibold ${getHealthTone(insight.health.runtime)}`}>{insight.health.runtime}</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Warnings</div>
+            <div className="mt-1 text-sm font-semibold text-amber-600 dark:text-amber-300">{insight.warningCount}</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Blockers</div>
+            <div className="mt-1 text-sm font-semibold text-rose-600 dark:text-rose-300">{insight.blockerCount}</div>
+          </div>
         </div>
       </div>
     </ClickableItem>
   );
 }
 
+function SignalsPanel({ signals }: { signals: TeamSignal[] }) {
+  if (signals.length === 0) {
+    return (
+      <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+        <div className="text-sm font-semibold text-[var(--text-primary)]">Signals</div>
+        <p className="mt-2 text-xs text-[var(--text-muted)]">当前没有明显异常，团队页数据覆盖处于稳定状态。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Signals</h3>
+          <p className="text-xs text-[var(--text-muted)]">聚焦缺协议文件、数据过期与运行态证据缺口。</p>
+        </div>
+        <div className="text-xs text-[var(--text-muted)]">{signals.length} 条</div>
+      </div>
+      <div className="mt-3 space-y-2">
+        {signals.slice(0, 8).map((signal) => (
+          <div key={signal.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-[var(--text-primary)]">{signal.title}</div>
+              <StatusBadge status={signal.severity} size="sm" />
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--text-secondary)]">{signal.agentKey} · {signal.description}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverviewProps) {
-  const summary = useMemo(() => getAgentSummary(agents), [agents]);
-  const sortedAgents = useMemo(() => [...agents].sort((left, right) => getAgentSortScore(right) - getAgentSortScore(left)), [agents]);
+  const [activeTab, setActiveTab] = useState<'roster' | 'signals'>('roster');
+  const { insights, summary, signals } = useMemo(() => buildTeamInsights(agents), [agents]);
+  const sortedInsights = useMemo(
+    () => [...insights].sort((left, right) => right.health.total - left.health.total || Number(isOnline(right.agent.state)) - Number(isOnline(left.agent.state))),
+    [insights]
+  );
 
   if (agents.length === 0) {
     return <EmptyState moduleType="agents" icon="empty-team" title="暂无智能体" description="还没有注册的智能体" />;
@@ -122,39 +259,71 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="在线" value={String(summary.onlineCount)} description="可立即调度的 agent" valueClassName="text-emerald-700" />
-        <SummaryCard label="空闲" value={String(summary.idleCount)} description="已在线但暂未占用" valueClassName="text-amber-700" />
-        <SummaryCard label="离线" value={String(summary.offlineCount)} description="需要检查状态上报" valueClassName="text-slate-700" />
-        <SummaryCard label="最近心跳" value={formatFreshnessLabel(summary.latestSeenAt)} description="来自最新一次 agent 更新" valueClassName="text-lg text-[var(--text-primary)]" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <SummaryCard label="在线" value={String(summary.onlineCount)} description="当前可立即调度的 agent" valueClassName="text-emerald-700 dark:text-emerald-300" />
+        <SummaryCard label="24h 活跃" value={String(summary.active24hCount)} description="最近 24 小时内有运行态证据" valueClassName="text-blue-700 dark:text-blue-300" />
+        <SummaryCard label="健康" value={String(summary.healthyCount)} description="Health ≥ 75 且无 blocker" valueClassName="text-emerald-700 dark:text-emerald-300" />
+        <SummaryCard label="异常关注" value={String(summary.attentionCount)} description="存在 warning / blocker 或评分偏低" valueClassName="text-amber-700 dark:text-amber-300" />
+        <SummaryCard label="协议缺口" value={String(summary.missingProtocolCount)} description="缺少核心文件或角色映射" valueClassName="text-rose-700 dark:text-rose-300" />
+        <SummaryCard label="数据过期" value={String(summary.staleCount)} description="状态来源未知或超过 24h 未刷新" valueClassName="text-rose-700 dark:text-rose-300" />
       </div>
 
       <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">实时状态</h3>
-            <p className="text-xs text-[var(--text-muted)]">按可调度优先级排序，优先展示在线与最近有心跳的成员。</p>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">团队概览</h3>
+            <p className="text-xs text-[var(--text-muted)]">证据驱动的 roster：显示来源、freshness、协议覆盖和健康拆解。</p>
           </div>
-          <div className="text-xs text-[var(--text-muted)]">共 {summary.total} 个 agent</div>
+          <div className="inline-flex rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-1">
+            <button
+              onClick={() => setActiveTab('roster')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'roster' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--text-secondary)]'}`}
+            >
+              Roster
+            </button>
+            <button
+              onClick={() => setActiveTab('signals')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'signals' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--text-secondary)]'}`}
+            >
+              Signals
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-y-auto -mx-2" style={{ maxHeight: showScene ? 'calc(100vh - 520px)' : 'calc(100vh - 360px)' }}>
-          {sortedAgents.map((agent) => (
-            <AgentItem key={agent.id} agent={agent} onClick={() => openDetail(agentToDetail(agent))} />
-          ))}
-        </div>
+        {activeTab === 'roster' ? (
+          <div className="mt-4">
+            {sortedInsights.map((insight) => (
+              <AgentItem key={insight.agent.id} insight={insight} onClick={() => openDetail(enhanceAgentDetail(insight))} />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+            <SignalsPanel signals={signals} />
+            <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">团队建议</h3>
+              <div className="mt-3 space-y-2 text-xs text-[var(--text-secondary)]">
+                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">1. 给 agent 建立更明确的角色/模型映射，减少 derived 数据的占比。</div>
+                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">2. 补齐运行态心跳和最近任务证据，让 freshness 更可信。</div>
+                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-3">3. 后续可增加 Hierarchy 视图，对比 declared 与 observed collaboration。</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {showScene && (
+      {showScene && activeTab === 'roster' && (
         <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">空间视图</h3>
-              <p className="text-xs text-[var(--text-muted)]">辅助观察分布与点击详情，不替代上面的实时状态列表。</p>
+              <p className="text-xs text-[var(--text-muted)]">作为辅助浏览层，点击仍会进入 evidence-first 的详情。</p>
             </div>
             <div className="text-xs text-[var(--text-muted)]">拖动旋转 · 滚轮缩放</div>
           </div>
-          <OfficeScene agents={sortedAgents} onAgentClick={(agent) => openDetail(agentToDetail(agent))} />
+          <OfficeScene agents={sortedInsights.map((item) => item.agent)} onAgentClick={(agent) => {
+            const insight = sortedInsights.find((item) => item.agent.id === agent.id);
+            openDetail(insight ? enhanceAgentDetail(insight) : agentToDetail(agent));
+          }} />
         </div>
       )}
     </div>
