@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import type { TeamSignal } from '@/features/dashboard/lib/team-insights';
 import { Icon } from './Icon';
 import { StatusBadge } from './StatusBadge';
 
@@ -989,8 +990,11 @@ export function DetailModal({ isOpen, onClose, data, onTaskUpdated, onRelatedObj
                   <RelatedObjects objects={data.relatedObjects!} onObjectClick={onRelatedObjectClick} />
                 )}
 
+                {/* Agent 专属 evidence-first 详情 */}
+                {data.type === 'agent' && <AgentDetailSections data={data} />}
+
                 {/* 额外字段 */}
-                {data.extra && Object.keys(data.extra).length > 0 && (
+                {data.type !== 'agent' && data.extra && Object.keys(data.extra).length > 0 && (
                   <div className="mt-4 pt-4 border-t border-[var(--border-light)] dark:border-[var(--border-medium)]">
                     <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">
                       其他信息
@@ -1109,6 +1113,94 @@ function DetailField({ label, icon, children }: DetailFieldProps) {
         <span className="text-sm text-[var(--text-muted)]">{label}</span>
       </div>
       <div className="flex-1 text-right">{children}</div>
+    </div>
+  );
+}
+
+function AgentEvidenceSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-4">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{title}</h4>
+      <div className="mt-3 space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function AgentSignalCard({ signal }: { signal: TeamSignal }) {
+  return (
+    <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium text-[var(--text-primary)]">{signal.title}</div>
+        <StatusBadge status={signal.severity} size="sm" />
+      </div>
+      <div className="mt-1 text-xs text-[var(--text-secondary)]">{signal.description}</div>
+    </div>
+  );
+}
+
+function AgentDetailSections({ data }: { data: DetailData }) {
+  const extra = data.extra || {};
+  const health = extra.health as { total?: number; protocol?: number; runtime?: number; config?: number; collaboration?: number; issues?: string[] } | undefined;
+  const evidence = extra.evidence as Record<string, { value?: string; sourceType?: string; sourceRef?: string; freshness?: string; confidence?: number; updatedAt?: string | null }> | undefined;
+  const signals = (extra.signals as TeamSignal[] | undefined) || [];
+  const recommendations = (extra.recommendations as string[] | undefined) || [];
+  const capabilities = (extra.capabilities as string[] | undefined) || [];
+  const protocolText = data.notes || '';
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AgentEvidenceSection title="Identity">
+          <DetailField label="Role" icon="owner"><span className="text-sm text-[var(--text-primary)]">{data.owner || '—'}</span></DetailField>
+          <DetailField label="Channel" icon="source"><span className="text-sm text-[var(--text-primary)]">{String(extra.channel || '—')}</span></DetailField>
+          <DetailField label="Model" icon="info"><span className="text-sm text-[var(--text-primary)]">{String(extra.model || '—')}</span></DetailField>
+          <DetailField label="Freshness" icon="clock"><span className="text-sm text-[var(--text-primary)]">{String(extra.freshness || '未知')}</span></DetailField>
+        </AgentEvidenceSection>
+
+        <AgentEvidenceSection title="Health Breakdown">
+          <DetailField label="Total" icon="status"><span className="text-sm font-semibold text-[var(--text-primary)]">{health?.total ?? '—'}</span></DetailField>
+          <DetailField label="Protocol" icon="info"><span className="text-sm text-[var(--text-primary)]">{health?.protocol ?? '—'}</span></DetailField>
+          <DetailField label="Runtime" icon="clock"><span className="text-sm text-[var(--text-primary)]">{health?.runtime ?? '—'}</span></DetailField>
+          <DetailField label="Config" icon="source"><span className="text-sm text-[var(--text-primary)]">{health?.config ?? '—'}</span></DetailField>
+          <DetailField label="Collaboration" icon="owner"><span className="text-sm text-[var(--text-primary)]">{health?.collaboration ?? '—'}</span></DetailField>
+        </AgentEvidenceSection>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AgentEvidenceSection title="Runtime Evidence">
+          {evidence && Object.entries(evidence).map(([key, item]) => (
+            <div key={key} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3 text-left">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{key}</div>
+                <span className="text-[10px] text-[var(--text-muted)]">{item.sourceType} · {item.freshness}</span>
+              </div>
+              <div className="mt-1 text-sm text-[var(--text-primary)]">{String(item.value ?? '—')}</div>
+              <div className="mt-1 text-[11px] text-[var(--text-secondary)]">{item.sourceRef}</div>
+              <div className="mt-1 text-[11px] text-[var(--text-muted)]">confidence: {Math.round((item.confidence || 0) * 100)}%</div>
+            </div>
+          ))}
+        </AgentEvidenceSection>
+
+        <AgentEvidenceSection title="Capabilities & Recommendations">
+          <div className="flex flex-wrap gap-2">
+            {capabilities.length > 0 ? capabilities.map((cap) => (
+              <span key={cap} className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-secondary)]">{cap}</span>
+            )) : <span className="text-xs text-[var(--text-muted)]">暂无能力标签</span>}
+          </div>
+          <div className="pt-2 space-y-2">
+            {recommendations.length > 0 ? recommendations.map((item, index) => (
+              <div key={index} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">{item}</div>
+            )) : <div className="text-xs text-[var(--text-muted)]">暂无补充建议</div>}
+          </div>
+        </AgentEvidenceSection>
+      </div>
+
+      <AgentEvidenceSection title="Protocol Coverage & Signals">
+        {protocolText && <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3 text-xs leading-6 whitespace-pre-wrap text-[var(--text-secondary)]">{protocolText}</div>}
+        <div className="grid gap-3 lg:grid-cols-2">
+          {signals.length > 0 ? signals.map((signal) => <AgentSignalCard key={signal.id} signal={signal} />) : <div className="text-xs text-[var(--text-muted)]">暂无显著信号</div>}
+        </div>
+      </AgentEvidenceSection>
     </div>
   );
 }
