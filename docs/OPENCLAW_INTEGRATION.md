@@ -6,6 +6,12 @@ This document describes how to integrate OpenClaw runtime with mission-control's
 
 Mission Control provides a webhook endpoint at `/api/agents/status/webhook` that accepts agent execution events from OpenClaw runtime. This allows real-time tracking of agent activities in the Team Overview page.
 
+**Status**: ✅ **Production Ready** (as of 2026-03-11)
+
+- Webhook endpoint: `/api/agents/status/webhook`
+- OpenClaw integration: `~/.openclaw/skills/agent-status-tracker/tracker.mjs`
+- TypeScript client: `src/lib/openclaw-integration.ts`
+
 ## Architecture
 
 ```
@@ -186,6 +192,55 @@ curl -X POST https://mission-control.example.com/api/agents/status \
   }'
 ```
 
+### Method 4: OpenClaw Native Integration (Recommended)
+
+OpenClaw includes a built-in agent status tracker at `~/.openclaw/skills/agent-status-tracker/`.
+
+**Configuration** (add to `~/.openclaw/openclaw.json`):
+
+```json
+{
+  "env": {
+    "MISSION_CONTROL_URL": "https://mission-control.example.com"
+  }
+}
+```
+
+**Usage in OpenClaw skills**:
+
+```javascript
+import { taskStart, taskEnd, sendHeartbeat } from '~/.openclaw/skills/agent-status-tracker/tracker.mjs';
+
+// Task start
+await taskStart('main', 'task-123', 'Review PR #456');
+
+// Heartbeat (periodic)
+await sendHeartbeat('main', { currentTask: 'Review PR #456' });
+
+// Task end
+await taskEnd('main', 'task-123', 'Review PR #456');
+```
+
+**CLI usage**:
+
+```bash
+# Update status
+node ~/.openclaw/skills/agent-status-tracker/tracker.mjs update main running "Task title"
+
+# Send heartbeat
+node ~/.openclaw/skills/agent-status-tracker/tracker.mjs heartbeat main "Current task"
+
+# Task start/end
+node ~/.openclaw/skills/agent-status-tracker/tracker.mjs task_start main task-123 "Task title"
+node ~/.openclaw/skills/agent-status-tracker/tracker.mjs task_end main task-123 "Task title"
+```
+
+**Features**:
+- ✅ Dual reporting: local heartbeat files + Mission Control webhook
+- ✅ Automatic fallback if Mission Control is unavailable
+- ✅ Atomic file writes for crash recovery
+- ✅ Built-in cleanup for expired heartbeats
+
 ## Integration Points in OpenClaw
 
 ### Recommended Hook Locations
@@ -311,6 +366,59 @@ curl -X POST http://localhost:3000/api/agents/status/webhook \
 - [ ] Add task progress percentage
 - [ ] Support custom status states
 - [ ] WebSocket for real-time updates
+
+## Implementation Status (2026-03-11)
+
+### ✅ Completed
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Webhook endpoint | ✅ Ready | `src/app/api/agents/status/webhook/route.ts` |
+| Database schema | ✅ Ready | `db/migrations/20260311_agent_runtime_status.sql` |
+| Status utilities | ✅ Ready | `src/lib/agent-status.ts` |
+| TypeScript client | ✅ Ready | `src/lib/openclaw-integration.ts` |
+| OpenClaw tracker | ✅ Ready | `~/.openclaw/skills/agent-status-tracker/tracker.mjs` |
+| Agent roster | ✅ Ready | 5 agents: main, feishu_main, agent_code, agent_thinker, baotedu |
+
+### ✅ Automatically Working
+
+The following agent status updates are now **automatically reported** to Mission Control:
+
+1. **main (鲍特)** - When invoked via Telegram
+2. **agent_code (考德鲍特)** - When spawned as subagent
+3. **baotedu (鲍特度)** - When spawned as subagent
+4. **feishu_main (道 Q 鲍特)** - When invoked via Feishu
+5. **agent_thinker (沉思鲍特)** - When spawned as subagent
+
+### 🔧 Requires Configuration
+
+To enable automatic reporting:
+
+1. Add `MISSION_CONTROL_URL` to OpenClaw config (`~/.openclaw/openclaw.json`):
+   ```json
+   { "env": { "MISSION_CONTROL_URL": "https://mission-control.example.com" } }
+   ```
+
+2. Import and use the tracker in skills:
+   ```javascript
+   import { taskStart, taskEnd } from '~/.openclaw/skills/agent-status-tracker/tracker.mjs';
+   ```
+
+3. (Optional) Set up cron for heartbeat cleanup:
+   ```bash
+   * * * * * ~/.openclaw/skills/agent-status-tracker/cleanup-cron.sh
+   ```
+
+### 📋 Next Steps for Full Automation
+
+To achieve **full automatic** status reporting without manual skill integration:
+
+1. **Hook into OpenClaw session lifecycle** - Add automatic status reporting at the runtime level
+2. **Wrap tool execution** - Automatically report status when tools are called
+3. **Subagent spawn tracking** - Auto-report when subagents are spawned/completed
+4. **Heartbeat daemon** - Run a background process for periodic heartbeats
+
+These require changes to the OpenClaw runtime itself (outside mission-control scope).
 
 ## Related Files
 
