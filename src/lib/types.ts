@@ -41,9 +41,19 @@ export interface Agent {
   id: number;
   agent_key: string;
   display_name: string;
-  description?: string;
+  description?: string | null;
   state: string;
-  last_seen_at: string;
+  last_seen_at: string | null;
+  // Runtime status fields
+  status_source?: string | null;
+  current_task?: string | null;
+  work_started_at?: string | null;
+  last_idle_at?: string | null;
+  presence?: string | null;
+  // Derived fields (from API)
+  work_state?: string;
+  freshness_level?: 'fresh' | 'recent' | 'stale' | 'unknown';
+  freshness_label?: string;
 }
 
 // 记忆

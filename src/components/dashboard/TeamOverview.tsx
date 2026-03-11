@@ -26,19 +26,29 @@ function getAvatarUrl(agentKey: string) {
   return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(agentKey)}&backgroundColor=1a1a2e`;
 }
 
-function isOnline(state: string) {
-  return state === 'online' || state === 'active' || state === 'running';
+function isOnline(state: string | null | undefined) {
+  return state === 'online' || state === 'active' || state === 'running' || state === 'working';
 }
 
-function getPresenceLabel(state: string) {
+function isIdle(state: string | null | undefined) {
+  return state === 'idle';
+}
+
+function isOffline(state: string | null | undefined) {
+  return state === 'offline' || !state;
+}
+
+function getPresenceLabel(state: string | null | undefined, presence?: string | null) {
+  if (presence === 'offline' || isOffline(state)) return '离线';
+  if (isIdle(state)) return '空闲';
   if (isOnline(state)) return '在线';
-  if (state === 'idle') return '空闲';
-  return '离线';
+  return '未知';
 }
 
-function getPresenceTone(state: string) {
+function getPresenceTone(state: string | null | undefined, presence?: string | null) {
+  if (presence === 'offline' || isOffline(state)) return 'bg-slate-500/12 text-slate-600 dark:text-slate-300';
+  if (isIdle(state)) return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
   if (isOnline(state)) return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
-  if (state === 'idle') return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
   return 'bg-slate-500/12 text-slate-600 dark:text-slate-300';
 }
 
@@ -130,6 +140,8 @@ function SummaryCard({
 
 function AgentItem({ insight, onClick }: { insight: TeamAgentInsight; onClick: () => void }) {
   const online = isOnline(insight.agent.state);
+  const idle = isIdle(insight.agent.state);
+  const offline = isOffline(insight.agent.state) || insight.agent.presence === 'offline';
 
   return (
     <ClickableItem onClick={onClick} className="-mx-2 rounded-xl px-2 group">
@@ -138,7 +150,7 @@ function AgentItem({ insight, onClick }: { insight: TeamAgentInsight; onClick: (
           <div className="min-w-0 flex items-start gap-3">
             <div
               className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2"
-              style={{ borderColor: online ? '#4ade80' : '#6b7280' }}
+              style={{ borderColor: online ? '#4ade80' : offline ? '#6b7280' : '#f59e0b' }}
             >
               <img src={getAvatarUrl(insight.agent.agent_key)} alt={insight.agent.display_name} className="h-full w-full object-cover" />
             </div>
@@ -148,8 +160,8 @@ function AgentItem({ insight, onClick }: { insight: TeamAgentInsight; onClick: (
                 <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
                   {insight.agent.agent_key}
                 </span>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getPresenceTone(insight.agent.state)}`}>
-                  {getPresenceLabel(insight.agent.state)}
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getPresenceTone(insight.agent.state, insight.agent.presence)}`}>
+                  {getPresenceLabel(insight.agent.state, insight.agent.presence)}
                 </span>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getFreshnessTone(insight.freshnessLevel)}`}>
                   {insight.freshnessLabel}
@@ -250,7 +262,15 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
   const [forceAllOnlinePreview, setForceAllOnlinePreview] = useState(true);
   const { insights, summary, signals } = useMemo(() => buildTeamInsights(agents), [agents]);
   const sortedInsights = useMemo(
-    () => [...insights].sort((left, right) => right.health.total - left.health.total || Number(isOnline(right.agent.state)) - Number(isOnline(left.agent.state))),
+    () => [...insights].sort((left, right) => {
+      // 在线优先，然后空闲，最后离线
+      const getPriority = (agent: typeof left.agent) => {
+        if (isOnline(agent.state) && agent.presence !== 'offline') return 2;
+        if (isIdle(agent.state)) return 1;
+        return 0;
+      };
+      return right.health.total - left.health.total || getPriority(right.agent) - getPriority(left.agent);
+    }),
     [insights]
   );
 
