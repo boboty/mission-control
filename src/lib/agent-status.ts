@@ -25,11 +25,13 @@ export async function updateAgentStatus(
   const pool = getPgPool(databaseUrl);
   const presence = state === 'offline' ? 'offline' : 'online';
 
+  // Compute timestamps in JS to avoid SQL type inference issues
+  const workStartedAt = state === 'running' ? new Date() : null;
+  const lastIdleAt = (state === 'idle' || state === 'offline') ? new Date() : null;
+
   await pool.query(
     `INSERT INTO agents (agent_key, display_name, description, state, presence, current_task, status_source, last_seen_at, work_started_at, last_idle_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), 
-       CASE WHEN $4 = 'running' THEN NOW() ELSE NULL END,
-       CASE WHEN $4 IN ('idle', 'offline') THEN NOW() ELSE NULL END)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9)
      ON CONFLICT (agent_key) DO UPDATE SET
        display_name = COALESCE(EXCLUDED.display_name, agents.display_name),
        description = COALESCE(EXCLUDED.description, agents.description),
@@ -48,6 +50,8 @@ export async function updateAgentStatus(
       presence,
       options.currentTask || null,
       options.statusSource || 'runtime',
+      workStartedAt,
+      lastIdleAt,
     ]
   );
 }
@@ -92,13 +96,13 @@ export async function updateAgentStatuses(
 
   for (const { agentKey, state, displayName, description, currentTask } of statuses) {
     const presence = state === 'offline' ? 'offline' : 'online';
+    const workStartedAt = state === 'running' ? new Date() : null;
+    const lastIdleAt = (state === 'idle' || state === 'offline') ? new Date() : null;
 
     try {
       await pool.query(
         `INSERT INTO agents (agent_key, display_name, description, state, presence, current_task, status_source, last_seen_at, work_started_at, last_idle_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'runtime', NOW(),
-           CASE WHEN $4 = 'running' THEN NOW() ELSE NULL END,
-           CASE WHEN $4 IN ('idle', 'offline') THEN NOW() ELSE NULL END)
+         VALUES ($1, $2, $3, $4, $5, $6, 'runtime', NOW(), $7, $8)
          ON CONFLICT (agent_key) DO UPDATE SET
            display_name = COALESCE(EXCLUDED.display_name, agents.display_name),
            description = COALESCE(EXCLUDED.description, agents.description),
@@ -115,6 +119,8 @@ export async function updateAgentStatuses(
           state,
           presence,
           currentTask || null,
+          workStartedAt,
+          lastIdleAt,
         ]
       );
       results.push({ agentKey, state, success: true });
