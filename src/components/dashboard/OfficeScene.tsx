@@ -642,7 +642,7 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
           );
         }
 
-        const online = isOnline(agent.state);
+        const online = true;
         const palette = getAgentPalette(index, online);
         const variant = getAgentVariant(index);
 
