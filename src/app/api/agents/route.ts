@@ -3,7 +3,6 @@ import { getPgPool } from '../_lib/pg';
 import { buildMeta, withLegacyListShape } from '../_lib/response';
 
 const AGENT_STATUS_TIMEOUT_MINUTES = Number(process.env.AGENT_STATUS_TIMEOUT_MINUTES || '10');
-const OBSERVED_BUSY_WINDOW_MINUTES = Number(process.env.AGENT_OBSERVED_BUSY_WINDOW_MINUTES || '180');
 
 const AGENT_OVERRIDES: Record<string, { displayName?: string; description?: string }> = {
   main: {
@@ -30,7 +29,15 @@ function normalizeAgentState(state: string | null | undefined) {
   return state;
 }
 
-function deriveAgentState(state: string | null | undefined, lastSeenAt: string | null | undefined) {
+function derivePresence(lastSeenAt: string | null | undefined, storedPresence: string | null | undefined) {
+  if (!lastSeenAt) return storedPresence || 'unknown';
+  const ageMs = Date.now() - new Date(lastSeenAt).getTime();
+  const timeoutMs = AGENT_STATUS_TIMEOUT_MINUTES * 60 * 1000;
+  if (ageMs > timeoutMs) return 'offline';
+  return storedPresence || 'online';
+}
+
+function deriveWorkState(state: string | null | undefined, lastSeenAt: string | null | undefined) {
   const normalized = normalizeAgentState(state);
   if (!lastSeenAt) return normalized;
 
@@ -44,28 +51,6 @@ function deriveAgentState(state: string | null | undefined, lastSeenAt: string |
   return normalized;
 }
 
-function getObservedBusyKeys() {
-  const raw = process.env.MISSION_CONTROL_BUSY_AGENTS || process.env.OPENCLAW_BUSY_AGENTS || '';
-  return new Set(
-    raw
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-  );
-}
-
-function applyObservedBusyState(agentKey: string, derivedState: string, lastSeenAt: string | null | undefined) {
-  const busyKeys = getObservedBusyKeys();
-  const ageMs = lastSeenAt ? Date.now() - new Date(lastSeenAt).getTime() : Number.POSITIVE_INFINITY;
-  const busyWindowMs = OBSERVED_BUSY_WINDOW_MINUTES * 60 * 1000;
-
-  if (busyKeys.has(agentKey) && ageMs <= busyWindowMs) {
-    return 'running';
-  }
-
-  return derivedState;
-}
-
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -76,23 +61,29 @@ export async function GET() {
 
   try {
     const result = await pool.query(`
-      SELECT id, agent_key, display_name, description, state, last_seen_at
+      SELECT id, agent_key, display_name, description, state, last_seen_at, current_task, status_source, work_started_at, last_idle_at, presence
       FROM agents
-      ORDER BY 
-        last_seen_at DESC NULLS LAST,
-        last_seen_at DESC NULLS LAST
+      ORDER BY last_seen_at DESC NULLS LAST
       LIMIT 20
     `);
 
     const agents = result.rows.map((row) => {
       const override = AGENT_OVERRIDES[row.agent_key] || {};
-      const derivedState = deriveAgentState(row.state, row.last_seen_at);
-      const state = applyObservedBusyState(row.agent_key, derivedState, row.last_seen_at);
+      const work_state = deriveWorkState(row.state, row.last_seen_at);
+      const presence = derivePresence(row.last_seen_at, row.presence);
+      const legacyState = presence === 'offline' ? 'offline' : work_state;
+
       return {
         ...row,
         display_name: override.displayName || row.display_name,
         description: override.description || row.description,
-        state,
+        state: legacyState,
+        work_state,
+        presence,
+        current_task: row.current_task || null,
+        status_source: row.status_source || 'runtime',
+        work_started_at: row.work_started_at || null,
+        last_idle_at: row.last_idle_at || null,
       };
     });
 
