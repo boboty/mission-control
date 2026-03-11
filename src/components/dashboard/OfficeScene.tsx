@@ -360,9 +360,9 @@ function Walls() {
 
 function PantryZone() {
   return (
-    <group position={[8.2, 0, 0.8]}>
+    <group position={[9.2, 0, -1.4]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
-        <planeGeometry args={[3.4, 2.8]} />
+        <planeGeometry args={[3.8, 3.2]} />
         <meshStandardMaterial color="#e0f2fe" roughness={0.95} />
       </mesh>
       <RoundedBox args={[2.8, 0.95, 0.7]} radius={0.04} position={[0, 0.48, -0.7]}>
@@ -380,6 +380,8 @@ function PantryZone() {
           <mesh position={[0,0.08,0]}><torusGeometry args={[0.055,0.012,8,16]} /><meshStandardMaterial color="#ffffff" /></mesh>
         </group>
       ))}
+      <mesh position={[0, 1.1, 0.95]}><boxGeometry args={[3.4, 0.08, 0.08]} /><meshStandardMaterial color="#94a3b8" /></mesh>
+      <mesh position={[-1.65, 1.1, -0.15]} rotation={[0, 0, 0]}><boxGeometry args={[0.08, 2.0, 1.8]} /><meshStandardMaterial color="#cbd5e1" transparent opacity={0.55} /></mesh>
       <Text position={[0,1.9,-0.5]} fontSize={0.16} color="#0f172a" anchorX="center">茶水间</Text>
     </group>
   );
@@ -387,9 +389,9 @@ function PantryZone() {
 
 function LoungeZone() {
   return (
-    <group position={[-8.2, 0, 1.2]}>
+    <group position={[-9.1, 0, 2.6]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
-        <planeGeometry args={[4.2, 3.2]} />
+        <planeGeometry args={[4.8, 3.8]} />
         <meshStandardMaterial color="#ede9fe" roughness={0.96} />
       </mesh>
       <group position={[0,0,0.25]}>
@@ -412,6 +414,8 @@ function LoungeZone() {
           <mesh key={i} position={[Math.sin(i*1.5)*0.16,0.72+i*0.08,Math.cos(i*1.5)*0.16]} rotation={[0.2,i*0.8,0.15]}><coneGeometry args={[0.1,0.35,5]} /><meshStandardMaterial color="#22c55e" roughness={0.7} /></mesh>
         ))}
       </group>
+      <mesh position={[0, 0.02, -1.45]} rotation={[-3.1415926/2, 0, 0]}><planeGeometry args={[2.4, 0.5]} /><meshStandardMaterial color="#c7d2fe" roughness={0.95} /></mesh>
+      <mesh position={[0, 1.1, 1.55]}><boxGeometry args={[4.1, 0.08, 0.08]} /><meshStandardMaterial color="#94a3b8" /></mesh>
       <Text position={[0,1.75,0]} fontSize={0.16} color="#312e81" anchorX="center">活动区</Text>
     </group>
   );
@@ -605,7 +609,7 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
       <FloorPattern />
       <Walls />
       <Decor />
-      <BossOffice position={[0, 0, -4.8]} state="working" />
+      <BossOffice position={[0, 0, -5.1]} state="working" />
 
       {rosterAgents.map((agent, index) => {
         const col = index % cols;
