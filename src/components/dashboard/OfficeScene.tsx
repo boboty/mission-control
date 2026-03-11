@@ -358,6 +358,65 @@ function Walls() {
   );
 }
 
+function PantryZone() {
+  return (
+    <group position={[8.2, 0, 0.8]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <planeGeometry args={[3.4, 2.8]} />
+        <meshStandardMaterial color="#e0f2fe" roughness={0.95} />
+      </mesh>
+      <RoundedBox args={[2.8, 0.95, 0.7]} radius={0.04} position={[0, 0.48, -0.7]}>
+        <meshStandardMaterial color="#cbd5e1" roughness={0.55} />
+      </RoundedBox>
+      <RoundedBox args={[0.7, 1.6, 0.7]} radius={0.04} position={[1.15, 0.8, -0.75]}>
+        <meshStandardMaterial color="#94a3b8" metalness={0.25} roughness={0.35} />
+      </RoundedBox>
+      <mesh position={[-0.6, 1.1, -0.35]}><boxGeometry args={[0.4, 0.5, 0.35]} /><meshStandardMaterial color="#111827" /></mesh>
+      <mesh position={[-0.05, 0.95, -0.35]}><cylinderGeometry args={[0.12, 0.12, 0.35, 18]} /><meshStandardMaterial color="#475569" /></mesh>
+      <mesh position={[-0.05, 1.18, -0.35]}><cylinderGeometry args={[0.08, 0.08, 0.08, 18]} /><meshStandardMaterial color="#0f172a" /></mesh>
+      {[[-0.8,0.18],[-0.25,0.18],[0.3,0.18]].map(([x,z],i)=>(
+        <group key={i} position={[x,0.48,z]}>
+          <mesh><cylinderGeometry args={[0.08,0.07,0.16,12]} /><meshStandardMaterial color={i===0?"#f59e0b":i===1?"#38bdf8":"#fb7185"} /></mesh>
+          <mesh position={[0,0.08,0]}><torusGeometry args={[0.055,0.012,8,16]} /><meshStandardMaterial color="#ffffff" /></mesh>
+        </group>
+      ))}
+      <Text position={[0,1.9,-0.5]} fontSize={0.16} color="#0f172a" anchorX="center">茶水间</Text>
+    </group>
+  );
+}
+
+function LoungeZone() {
+  return (
+    <group position={[-8.2, 0, 1.2]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <planeGeometry args={[4.2, 3.2]} />
+        <meshStandardMaterial color="#ede9fe" roughness={0.96} />
+      </mesh>
+      <group position={[0,0,0.25]}>
+        <RoundedBox args={[1.8,0.28,0.65]} radius={0.06} position={[0,0.16,0]}>
+          <meshStandardMaterial color="#64748b" roughness={0.85} />
+        </RoundedBox>
+        <RoundedBox args={[1.8,0.55,0.12]} radius={0.04} position={[0,0.52,-0.28]} rotation={[0.12,0,0]}>
+          <meshStandardMaterial color="#64748b" roughness={0.85} />
+        </RoundedBox>
+      </group>
+      <RoundedBox args={[0.9,0.05,0.55]} radius={0.03} position={[0,0.3,-0.85]}>
+        <meshStandardMaterial color="#8b5e3c" roughness={0.65} />
+      </RoundedBox>
+      {[[-0.3,0.38,-0.82],[0,0.38,-0.9],[0.25,0.38,-0.78]].map(([x,y,z],i)=>(
+        <mesh key={i} position={[x,y,z]}><cylinderGeometry args={[0.06,0.06,0.02,18]} /><meshStandardMaterial color={i===0?"#fb7185":i===1?"#fbbf24":"#60a5fa"} /></mesh>
+      ))}
+      <group position={[1.35,0,0.4]}>
+        <mesh position={[0,0.28,0]}><cylinderGeometry args={[0.32,0.36,0.56,20]} /><meshStandardMaterial color="#0f766e" roughness={0.8} /></mesh>
+        {[0,1,2,3].map(i=>(
+          <mesh key={i} position={[Math.sin(i*1.5)*0.16,0.72+i*0.08,Math.cos(i*1.5)*0.16]} rotation={[0.2,i*0.8,0.15]}><coneGeometry args={[0.1,0.35,5]} /><meshStandardMaterial color="#22c55e" roughness={0.7} /></mesh>
+        ))}
+      </group>
+      <Text position={[0,1.75,0]} fontSize={0.16} color="#312e81" anchorX="center">活动区</Text>
+    </group>
+  );
+}
+
 function Decor() {
   return (
     <group>
@@ -411,6 +470,9 @@ function Decor() {
           </mesh>
         ))}
       </group>
+
+      <PantryZone />
+      <LoungeZone />
     </group>
   );
 }
@@ -427,15 +489,15 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
   return (
     <group position={position} rotation={[0, Math.PI, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[4, 3.5]} />
+        <planeGeometry args={[6.2, 4.8]} />
         <meshStandardMaterial color="#92400e" roughness={0.9} />
       </mesh>
 
-      <mesh position={[-2, 1.5, 1.75]}>
+      <mesh position={[-3.1, 1.5, 2.35]}>
         <boxGeometry args={[0.08, 3, 0.08]} />
         <meshStandardMaterial color="#64748b" transparent opacity={0.3} />
       </mesh>
-      <mesh position={[2, 1.5, 1.75]}>
+      <mesh position={[3.1, 1.5, 2.35]}>
         <boxGeometry args={[0.08, 3, 0.08]} />
         <meshStandardMaterial color="#64748b" transparent opacity={0.3} />
       </mesh>
@@ -490,7 +552,7 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
         </RoundedBox>
       </group>
 
-      <group position={[-1.5, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+      <group position={[-2.25, 0, 0.25]} rotation={[0, Math.PI / 2, 0]}>
         <RoundedBox args={[1.2, 0.25, 0.5]} radius={0.05} position={[0, 0.125, 0]}>
           <meshStandardMaterial color="#475569" roughness={0.8} />
         </RoundedBox>
@@ -508,7 +570,7 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
         </RoundedBox>
       </group>
 
-      <group position={[-1.5, 0, -0.8]}>
+      <group position={[-2.25, 0, -0.9]}>
         <RoundedBox args={[0.5, 0.04, 0.35]} radius={0.02} position={[0, 0.32, 0]}>
           <meshStandardMaterial color="#78350f" roughness={0.6} />
         </RoundedBox>
