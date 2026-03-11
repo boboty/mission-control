@@ -10,8 +10,8 @@ const AGENT_OVERRIDES: Record<string, { displayName?: string; description?: stri
     description: '主助理，负责 Telegram 主会话与团队协调',
   },
   feishu_main: {
-    displayName: '笨燕',
-    description: '飞书办公助理，负责文档与办公流程',
+    displayName: '道Q鲍特',
+    description: '飞书办公助理，对外名为道Q鲍特，负责文档与办公流程',
   },
   agent_code: {
     displayName: '考德鲍特',
