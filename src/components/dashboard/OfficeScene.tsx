@@ -596,12 +596,13 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
 
 function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick?: (agent: Agent) => void }) {
   const rosterAgents = agents.filter((a) => !isBoss(a.agent_key));
-  const cols = 4;
-  const spacingX = 3.8;
-  const spacingZ = 3.4;
-  const rows = Math.max(1, Math.ceil(rosterAgents.length / cols));
+  const cols = 3;
+  const rows = 2;
+  const spacingX = 4.2;
+  const spacingZ = 3.8;
   const totalWidth = (cols - 1) * spacingX;
-  const totalDepth = Math.max(1, rows - 1) * spacingZ;
+  const totalDepth = (rows - 1) * spacingZ;
+  const maxSeats = cols * rows;
 
   return (
     <>
@@ -615,11 +616,32 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
       <Decor />
       <BossOffice position={[0, 0, -5.1]} state="working" />
 
-      {rosterAgents.map((agent, index) => {
+      {Array.from({ length: maxSeats }).map((_, index) => {
+        const agent = rosterAgents[index];
         const col = index % cols;
         const row = Math.floor(index / cols);
         const x = -totalWidth / 2 + col * spacingX;
-        const z = 0.8 + row * spacingZ;
+        const z = 1.1 + row * spacingZ;
+
+        if (!agent) {
+          return (
+            <group key={`empty-seat-${index}`}>
+              <Desk position={[x, 0, z]} online={false} accentColor="#94a3b8" />
+              <Text
+                position={[x, 1.02, z]}
+                fontSize={0.16}
+                color="#64748b"
+                anchorX="center"
+                anchorY="middle"
+                outlineWidth={0.012}
+                outlineColor="#ffffff"
+              >
+                虚位以待
+              </Text>
+            </group>
+          );
+        }
+
         const online = isOnline(agent.state);
         const palette = getAgentPalette(index, online);
         const variant = getAgentVariant(index);
