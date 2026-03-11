@@ -642,7 +642,7 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
           );
         }
 
-        const online = true;
+        const online = isOnline(agent.state);
         const palette = getAgentPalette(index, online);
         const variant = getAgentVariant(index);
 
@@ -680,10 +680,15 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
 interface OfficeSceneProps {
   agents: Agent[];
   onAgentClick?: (agent: Agent) => void;
+  forceAllOnline?: boolean;
 }
 
-export default function OfficeScene({ agents, onAgentClick }: OfficeSceneProps) {
+export default function OfficeScene({ agents, onAgentClick, forceAllOnline = false }: OfficeSceneProps) {
   const visibleAgents = useMemo(() => agents.filter((a) => !isBoss(a.agent_key)).length, [agents]);
+  const sceneAgents = useMemo(
+    () => forceAllOnline ? agents.map((agent) => (isBoss(agent.agent_key) ? agent : { ...agent, state: 'online' })) : agents,
+    [agents, forceAllOnline]
+  );
 
   return (
     <div className="h-[560px] rounded-xl overflow-hidden border border-[var(--border-light)] bg-gradient-to-b from-slate-100 to-slate-200 relative">
@@ -691,11 +696,11 @@ export default function OfficeScene({ agents, onAgentClick }: OfficeSceneProps) 
         🖱️ 拖动旋转 · 滚轮缩放 · 点击查看
       </div>
       <div className="absolute top-3 right-3 z-10 px-2 py-1 bg-white/80 text-slate-600 text-xs rounded shadow-sm backdrop-blur-sm">
-        已展示 {visibleAgents} 个 Agent · Boss 办公室保留
+        已展示 {visibleAgents} 个 Agent · Boss 办公室保留{forceAllOnline ? ' · 全员在线预览' : ''}
       </div>
 
       <Canvas camera={{ position: [13, 10, 14], fov: 30 }} shadows gl={{ antialias: true }}>
-        <OfficeContent agents={agents} onAgentClick={onAgentClick} />
+        <OfficeContent agents={sceneAgents} onAgentClick={onAgentClick} />
       </Canvas>
     </div>
   );

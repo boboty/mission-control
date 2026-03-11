@@ -247,6 +247,7 @@ function SignalsPanel({ signals }: { signals: TeamSignal[] }) {
 
 export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverviewProps) {
   const [activeTab, setActiveTab] = useState<'roster' | 'signals'>('roster');
+  const [forceAllOnlinePreview, setForceAllOnlinePreview] = useState(true);
   const { insights, summary, signals } = useMemo(() => buildTeamInsights(agents), [agents]);
   const sortedInsights = useMemo(
     () => [...insights].sort((left, right) => right.health.total - left.health.total || Number(isOnline(right.agent.state)) - Number(isOnline(left.agent.state))),
@@ -318,9 +319,20 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">空间视图</h3>
               <p className="text-xs text-[var(--text-muted)]">作为辅助浏览层，点击仍会进入 evidence-first 的详情。</p>
             </div>
-            <div className="text-xs text-[var(--text-muted)]">拖动旋转 · 滚轮缩放</div>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                <input
+                  type="checkbox"
+                  checked={forceAllOnlinePreview}
+                  onChange={(event) => setForceAllOnlinePreview(event.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border-light)]"
+                />
+                全员在线预览
+              </label>
+              <div className="text-xs text-[var(--text-muted)]">拖动旋转 · 滚轮缩放</div>
+            </div>
           </div>
-          <OfficeScene agents={sortedInsights.map((item) => item.agent)} onAgentClick={(agent) => {
+          <OfficeScene agents={sortedInsights.map((item) => item.agent)} forceAllOnline={forceAllOnlinePreview} onAgentClick={(agent) => {
             const insight = sortedInsights.find((item) => item.agent.id === agent.id);
             openDetail(insight ? enhanceAgentDetail(insight) : agentToDetail(agent));
           }} />
