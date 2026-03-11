@@ -41,12 +41,6 @@ const AGENT_OVERRIDES: Record<string, { displayName?: string; description?: stri
     role: '推理代理',
     channel: 'OpenClaw',
   },
-  agent_q: {
-    displayName: '道 Q 鲍特',
-    description: '轻量问答/协调代理',
-    role: '问答代理',
-    channel: 'OpenClaw',
-  },
 };
 
 // 完整的团队 roster（排除 boss）
