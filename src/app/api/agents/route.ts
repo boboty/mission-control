@@ -21,7 +21,29 @@ const AGENT_OVERRIDES: Record<string, { displayName?: string; description?: stri
     displayName: '鲍特度',
     description: '经济型子代理，承接低成本子任务',
   },
+  agent_thinker: {
+    displayName: '沉思鲍特',
+    description: '深度推理代理，负责架构与决策思考',
+  },
+  agent_q: {
+    displayName: '道Q鲍特',
+    description: '轻量问答/协调代理',
+  },
 };
+
+const KNOWN_TEAM_ROSTER = Object.entries(AGENT_OVERRIDES).map(([agent_key, value], index) => ({
+  id: -(index + 1),
+  agent_key,
+  display_name: value.displayName || agent_key,
+  description: value.description || null,
+  state: 'offline',
+  last_seen_at: null,
+  current_task: null,
+  status_source: 'roster',
+  work_started_at: null,
+  last_idle_at: null,
+  presence: 'unknown',
+}));
 
 function normalizeAgentState(state: string | null | undefined) {
   if (!state) return 'idle';
@@ -61,19 +83,37 @@ export async function GET() {
 
   try {
     const result = await pool.query(`
-      SELECT id, agent_key, display_name, description, state, last_seen_at, current_task, status_source, work_started_at, last_idle_at, presence
+      SELECT
+        id,
+        agent_key,
+        display_name,
+        description,
+        state,
+        last_seen_at,
+        NULL::text AS current_task,
+        'runtime'::text AS status_source,
+        NULL::timestamptz AS work_started_at,
+        NULL::timestamptz AS last_idle_at,
+        'online'::text AS presence
       FROM agents
       ORDER BY last_seen_at DESC NULLS LAST
       LIMIT 20
     `);
 
-    const agents = result.rows.map((row) => {
+    const merged = new Map<string, any>();
+
+    for (const rosterRow of KNOWN_TEAM_ROSTER) {
+      merged.set(rosterRow.agent_key, rosterRow);
+    }
+
+    for (const row of result.rows) {
       const override = AGENT_OVERRIDES[row.agent_key] || {};
       const work_state = deriveWorkState(row.state, row.last_seen_at);
       const presence = derivePresence(row.last_seen_at, row.presence);
       const legacyState = presence === 'offline' ? 'offline' : work_state;
 
-      return {
+      merged.set(row.agent_key, {
+        ...(merged.get(row.agent_key) || {}),
         ...row,
         display_name: override.displayName || row.display_name,
         description: override.description || row.description,
@@ -84,7 +124,13 @@ export async function GET() {
         status_source: row.status_source || 'runtime',
         work_started_at: row.work_started_at || null,
         last_idle_at: row.last_idle_at || null,
-      };
+      });
+    }
+
+    const agents = Array.from(merged.values()).sort((a, b) => {
+      const aTime = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+      const bTime = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+      return bTime - aTime;
     });
 
     const meta = buildMeta({
