@@ -268,8 +268,8 @@ function Desk({ position, online, accentColor, onClick }: {
         ))}
       </group>
 
-      {/* 椅子朝向屏幕：屏幕在 -Z，座椅面向 -Z，不再额外 180° 翻转 */}
-      <group position={[0, 0, 0.55]} rotation={[0, 0, 0]}>
+      {/* 椅子朝向屏幕：椅子位于桌子 +Z 侧，因此需旋转 PI 朝向 -Z 的显示器 */}
+      <group position={[0, 0, 0.55]} rotation={[0, Math.PI, 0]}>
         <RoundedBox args={[0.4, 0.08, 0.4]} radius={0.02} position={[0, 0.22, 0]}>
           <meshStandardMaterial color="#94a3b8" roughness={0.7} />
         </RoundedBox>
@@ -389,26 +389,26 @@ function PantryZone() {
 
 function LoungeZone() {
   return (
-    <group position={[-9.1, 0, 2.6]}>
+    <group position={[-7.8, 0, 2.2]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
         <planeGeometry args={[4.8, 3.8]} />
         <meshStandardMaterial color="#ede9fe" roughness={0.96} />
       </mesh>
-      <group position={[0,0,0.25]}>
-        <RoundedBox args={[1.8,0.28,0.65]} radius={0.06} position={[0,0.16,0]}>
+      <group position={[-0.45,0,0.15]} rotation={[0,-Math.PI/2,0]}>
+        <RoundedBox args={[2.1,0.28,0.72]} radius={0.06} position={[0,0.16,0]}>
           <meshStandardMaterial color="#64748b" roughness={0.85} />
         </RoundedBox>
-        <RoundedBox args={[1.8,0.55,0.12]} radius={0.04} position={[0,0.52,-0.28]} rotation={[0.12,0,0]}>
+        <RoundedBox args={[2.1,0.58,0.12]} radius={0.04} position={[0,0.54,-0.3]} rotation={[0.12,0,0]}>
           <meshStandardMaterial color="#64748b" roughness={0.85} />
         </RoundedBox>
       </group>
-      <RoundedBox args={[0.9,0.05,0.55]} radius={0.03} position={[0,0.3,-0.85]}>
+      <RoundedBox args={[1.0,0.05,0.6]} radius={0.03} position={[-1.55,0.3,0.15]}>
         <meshStandardMaterial color="#8b5e3c" roughness={0.65} />
       </RoundedBox>
-      {[[-0.3,0.38,-0.82],[0,0.38,-0.9],[0.25,0.38,-0.78]].map(([x,y,z],i)=>(
+      {[[-1.82,0.38,0.18],[-1.55,0.38,0.06],[-1.3,0.38,0.2]].map(([x,y,z],i)=>(
         <mesh key={i} position={[x,y,z]}><cylinderGeometry args={[0.06,0.06,0.02,18]} /><meshStandardMaterial color={i===0?"#fb7185":i===1?"#fbbf24":"#60a5fa"} /></mesh>
       ))}
-      <group position={[1.35,0,0.4]}>
+      <group position={[1.55,0,0.8]}>
         <mesh position={[0,0.28,0]}><cylinderGeometry args={[0.32,0.36,0.56,20]} /><meshStandardMaterial color="#0f766e" roughness={0.8} /></mesh>
         {[0,1,2,3].map(i=>(
           <mesh key={i} position={[Math.sin(i*1.5)*0.16,0.72+i*0.08,Math.cos(i*1.5)*0.16]} rotation={[0.2,i*0.8,0.15]}><coneGeometry args={[0.1,0.35,5]} /><meshStandardMaterial color="#22c55e" roughness={0.7} /></mesh>
@@ -443,13 +443,17 @@ function Decor() {
         </mesh>
       </group>
 
-      <group position={[-10.95, 2, 2]} rotation={[0, Math.PI / 2, 0]}>
+      <group position={[-10.9, 2.05, 2.0]} rotation={[0, Math.PI / 2, 0]}>
         <mesh>
-          <planeGeometry args={[1.4, 0.9]} />
-          <meshStandardMaterial color="#3b82f6" roughness={0.8} />
+          <boxGeometry args={[1.8, 1.1, 0.08]} />
+          <meshStandardMaterial color="#111827" metalness={0.4} roughness={0.25} />
         </mesh>
-        <Text position={[0, 0, 0.01]} fontSize={0.11} color="#ffffff" anchorX="center" anchorY="middle">
-          MISSION CONTROL
+        <mesh position={[0, 0, 0.05]}>
+          <planeGeometry args={[1.55, 0.88]} />
+          <meshStandardMaterial color="#0f172a" emissive="#0ea5e9" emissiveIntensity={0.18} />
+        </mesh>
+        <Text position={[0, 0.02, 0.06]} fontSize={0.1} color="#e0f2fe" anchorX="center" anchorY="middle">
+          Team Live
         </Text>
       </group>
 
