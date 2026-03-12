@@ -9,13 +9,13 @@ import { type Agent } from '@/lib/types';
 export type OperatorAction = '工作' | '喝茶' | '巡视';
 
 const OPERATOR_WORK_POSITION = new THREE.Vector3(0, 0.28, -5.82);
-const OPERATOR_TEA_POSITION = new THREE.Vector3(6.65, 0.02, -0.25);
+const OPERATOR_TEA_POSITION = new THREE.Vector3(6.65, 0, -0.25);
 const OPERATOR_PATROL_POINTS = [
-  new THREE.Vector3(-6.8, 0.02, -1.8),
-  new THREE.Vector3(-6.8, 0.02, 6.2),
-  new THREE.Vector3(6.4, 0.02, 6.2),
-  new THREE.Vector3(6.4, 0.02, 0.8),
-  new THREE.Vector3(4.8, 0.02, -1.8),
+  new THREE.Vector3(-6.8, 0, -1.8),
+  new THREE.Vector3(-6.8, 0, 6.2),
+  new THREE.Vector3(6.4, 0, 6.2),
+  new THREE.Vector3(6.4, 0, 0.8),
+  new THREE.Vector3(4.8, 0, -1.8),
 ];
 
 function samplePatrolPath(progress: number) {
@@ -292,6 +292,18 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
     }
     if (ringRef.current) {
       ringRef.current.position.y = seated ? -0.25 : 0.03;
+    }
+    if (leftThighRef.current) {
+      leftThighRef.current.position.y = seated ? 0.12 : 0.4;
+    }
+    if (rightThighRef.current) {
+      rightThighRef.current.position.y = seated ? 0.12 : 0.4;
+    }
+    if (leftCalfRef.current) {
+      leftCalfRef.current.position.z = seated ? 0.01 : 0;
+    }
+    if (rightCalfRef.current) {
+      rightCalfRef.current.position.z = seated ? 0.01 : 0;
     }
 
     if (leftUpperArmRef.current) {
@@ -754,7 +766,7 @@ function Decor() {
       ))}
 
       <group position={[9, 0, 5.5]}>
-        <mesh>
+        <mesh position={[0, 0.25, 0]}>
           <cylinderGeometry args={[0.2, 0.25, 0.5, 8]} />
           <meshStandardMaterial color="#d97706" roughness={0.8} />
         </mesh>
@@ -958,11 +970,20 @@ function OfficeContent({
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
+        screenSpacePanning={true}
+        panSpeed={1.15}
+        rotateSpeed={0.85}
+        zoomSpeed={0.9}
         minPolarAngle={Math.PI / 10}
         maxPolarAngle={Math.PI / 2.05}
         minDistance={7}
         maxDistance={24}
         autoRotate={false}
+        mouseButtons={{
+          LEFT: THREE.MOUSE.ROTATE,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.PAN,
+        }}
         target={[0, 1.2, Math.max(1, totalDepth / 3)]}
       />
     </>
@@ -993,7 +1014,7 @@ export default function OfficeScene({
   return (
     <div className="h-[560px] rounded-xl overflow-hidden border border-[var(--border-light)] bg-gradient-to-b from-slate-100 to-slate-200 relative">
       <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-white/80 text-slate-600 text-xs rounded shadow-sm backdrop-blur-sm">
-        🖱️ 拖动旋转 · 滚轮缩放 · 点击查看
+        左键旋转 · 右键平移 · 滚轮缩放 · 点击查看
       </div>
       <div className="absolute top-3 right-3 z-10 px-2 py-1 bg-white/80 text-slate-600 text-xs rounded shadow-sm backdrop-blur-sm">
         已展示 {visibleAgents} 个 Agent + 1 位操作者{forceAllOnline ? ' · 全员在线预览' : ''}
