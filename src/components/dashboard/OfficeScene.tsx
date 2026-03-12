@@ -10,13 +10,13 @@ export type OperatorAction = '工作' | '喝茶' | '巡视';
 type SceneControlMode = 'rotate' | 'pan';
 
 const OPERATOR_WORK_POSITION = new THREE.Vector3(0, 0.28, -5.82);
-const OPERATOR_TEA_POSITION = new THREE.Vector3(6.65, 0, -0.25);
+const OPERATOR_TEA_POSITION = new THREE.Vector3(6.65, 0.42, -0.25);
 const OPERATOR_PATROL_POINTS = [
-  new THREE.Vector3(-6.8, 0, -1.8),
-  new THREE.Vector3(-6.8, 0, 6.2),
-  new THREE.Vector3(6.4, 0, 6.2),
-  new THREE.Vector3(6.4, 0, 0.8),
-  new THREE.Vector3(4.8, 0, -1.8),
+  new THREE.Vector3(-6.8, 0.42, -1.8),
+  new THREE.Vector3(-6.8, 0.42, 6.2),
+  new THREE.Vector3(6.4, 0.42, 6.2),
+  new THREE.Vector3(6.4, 0.42, 0.8),
+  new THREE.Vector3(4.8, 0.42, -1.8),
 ];
 
 function samplePatrolPath(progress: number) {
@@ -286,19 +286,13 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
 
     if (torsoRef.current) {
       torsoRef.current.rotation.x = seated ? 0.15 : drinkingTea ? 0.03 : 0;
-      torsoRef.current.position.y = seated ? 0.02 : 0.06;
+      torsoRef.current.position.y = seated ? 0.02 : 0;
     }
     if (headRef.current) {
       headRef.current.rotation.x = seated ? -0.08 : drinkingTea ? 0.04 : 0;
     }
     if (ringRef.current) {
       ringRef.current.position.y = seated ? -0.25 : 0.03;
-    }
-    if (leftThighRef.current) {
-      leftThighRef.current.position.y = seated ? 0.12 : 0.56;
-    }
-    if (rightThighRef.current) {
-      rightThighRef.current.position.y = seated ? 0.12 : 0.56;
     }
     if (leftCalfRef.current) {
       leftCalfRef.current.position.z = seated ? 0.01 : 0;
