@@ -8,8 +8,30 @@ import { type Agent } from '@/lib/types';
 
 export type OperatorAction = '工作' | '喝茶' | '巡视';
 
-const OPERATOR_WORK_POSITION = new THREE.Vector3(0.1, 0.42, -5.05);
-const OPERATOR_TEA_POSITION = new THREE.Vector3(8.4, 0.42, -1.15);
+const OPERATOR_WORK_POSITION = new THREE.Vector3(0, 0.28, -5.82);
+const OPERATOR_TEA_POSITION = new THREE.Vector3(6.65, 0.02, -0.25);
+const OPERATOR_PATROL_POINTS = [
+  new THREE.Vector3(-6.8, 0.02, -1.8),
+  new THREE.Vector3(-6.8, 0.02, 6.2),
+  new THREE.Vector3(6.4, 0.02, 6.2),
+  new THREE.Vector3(6.4, 0.02, 0.8),
+  new THREE.Vector3(4.8, 0.02, -1.8),
+];
+
+function samplePatrolPath(progress: number) {
+  const totalSegments = OPERATOR_PATROL_POINTS.length;
+  const normalized = ((progress % 1) + 1) % 1;
+  const scaled = normalized * totalSegments;
+  const index = Math.floor(scaled);
+  const nextIndex = (index + 1) % totalSegments;
+  const localT = scaled - index;
+
+  return new THREE.Vector3().lerpVectors(
+    OPERATOR_PATROL_POINTS[index],
+    OPERATOR_PATROL_POINTS[nextIndex],
+    localT
+  );
+}
 
 function isOnline(state: string): boolean {
   return state === 'online' || state === 'active' || state === 'running' || state === 'working';
@@ -217,8 +239,17 @@ function AgentFigure({
 
 function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?: () => void }) {
   const groupRef = useRef<THREE.Group>(null);
-  const leftArmRef = useRef<THREE.Mesh>(null);
-  const rightArmRef = useRef<THREE.Mesh>(null);
+  const torsoRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const leftUpperArmRef = useRef<THREE.Group>(null);
+  const rightUpperArmRef = useRef<THREE.Group>(null);
+  const leftForearmRef = useRef<THREE.Group>(null);
+  const rightForearmRef = useRef<THREE.Group>(null);
+  const leftThighRef = useRef<THREE.Group>(null);
+  const rightThighRef = useRef<THREE.Group>(null);
+  const leftCalfRef = useRef<THREE.Group>(null);
+  const rightCalfRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   useCursor(hovered);
 
@@ -229,34 +260,67 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
 
     const t = state.clock.getElapsedTime();
     const position = groupRef.current.position;
+    const seated = action === '工作';
+    const patrolling = action === '巡视';
+    const drinkingTea = action === '喝茶';
 
-    if (action === '巡视') {
-      const patrolT = t * 0.42;
-      position.x = Math.sin(patrolT) * 4.4;
-      position.z = 0.45 + Math.cos(patrolT * 1.3) * 0.7;
-      position.y = 0.42 + Math.sin(t * 2.4) * 0.02;
-      groupRef.current.rotation.y = Math.PI / 2 - patrolT;
+    if (patrolling) {
+      const patrolProgress = (t * 0.06) % 1;
+      const target = samplePatrolPath(patrolProgress);
+      const lookAhead = samplePatrolPath((patrolProgress + 0.012) % 1);
+      const direction = new THREE.Vector3().subVectors(lookAhead, target);
+
+      position.lerp(target, 0.14);
+      position.y = target.y + Math.sin(t * 4.2) * 0.02;
+      groupRef.current.rotation.y = Math.atan2(direction.x, direction.z) + Math.PI;
     } else {
       const target = action === '喝茶' ? OPERATOR_TEA_POSITION : OPERATOR_WORK_POSITION;
-      position.lerp(target, 0.08);
-      position.y = target.y + Math.sin(t * 2) * (action === '工作' ? 0.008 : 0.02);
-      groupRef.current.rotation.y = action === '工作' ? Math.PI : -Math.PI / 2.35;
+      position.lerp(target, seated ? 0.18 : 0.1);
+      position.y = target.y + Math.sin(t * 2) * (seated ? 0.004 : 0.015);
+      groupRef.current.rotation.y = seated ? Math.PI : -Math.PI / 2.6;
     }
 
-    if (leftArmRef.current) {
-      leftArmRef.current.rotation.z = action === '巡视'
-        ? Math.sin(t * 5) * 0.35
-        : action === '喝茶'
-          ? -0.35
-          : -0.15 + Math.sin(t * 7) * 0.08;
+    const walkCycle = Math.sin(t * 6);
+    const walkCycleInverse = Math.sin(t * 6 + Math.PI);
+
+    if (torsoRef.current) {
+      torsoRef.current.rotation.x = seated ? 0.15 : drinkingTea ? 0.03 : 0;
+      torsoRef.current.position.y = seated ? 0.02 : 0;
+    }
+    if (headRef.current) {
+      headRef.current.rotation.x = seated ? -0.08 : drinkingTea ? 0.04 : 0;
+    }
+    if (ringRef.current) {
+      ringRef.current.position.y = seated ? -0.25 : 0.03;
     }
 
-    if (rightArmRef.current) {
-      rightArmRef.current.rotation.z = action === '喝茶'
-        ? -1.05 + Math.sin(t * 4) * 0.06
-        : action === '巡视'
-          ? -Math.sin(t * 5) * 0.35
-          : 0.18 + Math.sin(t * 7 + 0.4) * 0.08;
+    if (leftUpperArmRef.current) {
+      leftUpperArmRef.current.rotation.x = seated ? 1.02 : drinkingTea ? 0.2 : 0;
+      leftUpperArmRef.current.rotation.z = patrolling ? 0.28 * walkCycle : seated ? -0.14 : -0.08;
+    }
+    if (rightUpperArmRef.current) {
+      rightUpperArmRef.current.rotation.x = seated ? 1.1 : drinkingTea ? 0.6 : 0;
+      rightUpperArmRef.current.rotation.z = patrolling ? 0.28 * walkCycleInverse : drinkingTea ? -0.1 : 0.08;
+    }
+    if (leftForearmRef.current) {
+      leftForearmRef.current.rotation.x = seated ? -0.85 : drinkingTea ? -0.15 : 0;
+      leftForearmRef.current.rotation.z = drinkingTea ? -0.12 : 0;
+    }
+    if (rightForearmRef.current) {
+      rightForearmRef.current.rotation.x = seated ? -0.95 : drinkingTea ? -1.35 : 0;
+      rightForearmRef.current.rotation.z = drinkingTea ? -0.18 : 0;
+    }
+    if (leftThighRef.current) {
+      leftThighRef.current.rotation.x = seated ? -1.28 : patrolling ? 0.48 * walkCycle : 0;
+    }
+    if (rightThighRef.current) {
+      rightThighRef.current.rotation.x = seated ? -1.28 : patrolling ? 0.48 * walkCycleInverse : 0;
+    }
+    if (leftCalfRef.current) {
+      leftCalfRef.current.rotation.x = seated ? 1.42 : patrolling ? Math.max(0, -0.38 * walkCycle) : 0;
+    }
+    if (rightCalfRef.current) {
+      rightCalfRef.current.rotation.x = seated ? 1.42 : patrolling ? Math.max(0, -0.38 * walkCycleInverse) : 0;
     }
   });
 
@@ -268,46 +332,126 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
       onPointerOut={() => setHovered(false)}
       onClick={onClick}
     >
-      <mesh position={[0, 0.7, 0]}>
-        <sphereGeometry args={[0.16, 18, 18]} />
-        <meshStandardMaterial color="#f1c27d" roughness={0.75} />
-      </mesh>
+      <group ref={torsoRef}>
+        <mesh position={[0, 0.34, 0]}>
+          <capsuleGeometry args={[0.125, 0.34, 8, 14]} />
+          <meshStandardMaterial color={accent.primary} roughness={0.55} />
+        </mesh>
+        <mesh position={[0, 0.12, 0]}>
+          <sphereGeometry args={[0.17, 18, 18]} />
+          <meshStandardMaterial color="#111827" roughness={0.72} />
+        </mesh>
+      </group>
 
-      <mesh position={[0, 0.95, -0.02]}>
-        <sphereGeometry args={[0.17, 18, 18]} />
-        <meshStandardMaterial color="#111827" roughness={0.45} />
-      </mesh>
+      <group ref={headRef} position={[0, 0.76, 0]}>
+        <mesh position={[0, 0, 0]}>
+          <sphereGeometry args={[0.16, 20, 20]} />
+          <meshStandardMaterial color="#f1c27d" roughness={0.78} />
+        </mesh>
+        <mesh position={[0, 0.12, -0.01]}>
+          <sphereGeometry args={[0.16, 18, 18]} />
+          <meshStandardMaterial color="#111827" roughness={0.45} />
+        </mesh>
+        <mesh position={[-0.055, 0.005, -0.145]}>
+          <sphereGeometry args={[0.018, 12, 12]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[0.055, 0.005, -0.145]}>
+          <sphereGeometry args={[0.018, 12, 12]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[-0.055, 0.005, -0.158]}>
+          <sphereGeometry args={[0.009, 10, 10]} />
+          <meshStandardMaterial color="#111827" emissive="#0f172a" emissiveIntensity={0.35} />
+        </mesh>
+        <mesh position={[0.055, 0.005, -0.158]}>
+          <sphereGeometry args={[0.009, 10, 10]} />
+          <meshStandardMaterial color="#111827" emissive="#0f172a" emissiveIntensity={0.35} />
+        </mesh>
+        <mesh position={[-0.055, 0.005, -0.152]}>
+          <torusGeometry args={[0.038, 0.006, 8, 18]} />
+          <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.3} />
+        </mesh>
+        <mesh position={[0.055, 0.005, -0.152]}>
+          <torusGeometry args={[0.038, 0.006, 8, 18]} />
+          <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, 0.005, -0.152]}>
+          <boxGeometry args={[0.04, 0.008, 0.008]} />
+          <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.3} />
+        </mesh>
+        <mesh position={[-0.108, 0.005, -0.135]} rotation={[0, 0.22, 0]}>
+          <boxGeometry args={[0.03, 0.006, 0.006]} />
+          <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.3} />
+        </mesh>
+        <mesh position={[0.108, 0.005, -0.135]} rotation={[0, -0.22, 0]}>
+          <boxGeometry args={[0.03, 0.006, 0.006]} />
+          <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.3} />
+        </mesh>
+      </group>
 
-      <mesh position={[0, 0.36, 0]}>
-        <capsuleGeometry args={[0.12, 0.34, 8, 14]} />
-        <meshStandardMaterial color={accent.primary} roughness={0.55} />
-      </mesh>
+      <group ref={leftUpperArmRef} position={[-0.18, 0.5, 0]}>
+        <mesh position={[0, -0.11, 0]}>
+          <capsuleGeometry args={[0.032, 0.22, 6, 10]} />
+          <meshStandardMaterial color={accent.primary} roughness={0.65} />
+        </mesh>
+        <group ref={leftForearmRef} position={[0, -0.22, 0]}>
+          <mesh position={[0, -0.1, 0]}>
+            <capsuleGeometry args={[0.028, 0.2, 6, 10]} />
+            <meshStandardMaterial color="#f1c27d" roughness={0.82} />
+          </mesh>
+        </group>
+      </group>
 
-      <mesh position={[0, 0.13, 0]}>
-        <sphereGeometry args={[0.18, 18, 18]} />
-        <meshStandardMaterial color="#111827" roughness={0.7} />
-      </mesh>
+      <group ref={rightUpperArmRef} position={[0.18, 0.5, 0]}>
+        <mesh position={[0, -0.11, 0]}>
+          <capsuleGeometry args={[0.032, 0.22, 6, 10]} />
+          <meshStandardMaterial color={accent.primary} roughness={0.65} />
+        </mesh>
+        <group ref={rightForearmRef} position={[0, -0.22, 0]}>
+          <mesh position={[0, -0.1, 0]}>
+            <capsuleGeometry args={[0.028, 0.2, 6, 10]} />
+            <meshStandardMaterial color="#f1c27d" roughness={0.82} />
+          </mesh>
+        </group>
+      </group>
 
-      <mesh ref={leftArmRef} position={[-0.18, 0.42, 0]} rotation={[0, 0, -0.2]}>
-        <capsuleGeometry args={[0.035, 0.24, 6, 10]} />
-        <meshStandardMaterial color="#f1c27d" roughness={0.8} />
-      </mesh>
-      <mesh ref={rightArmRef} position={[0.18, 0.42, 0]} rotation={[0, 0, 0.2]}>
-        <capsuleGeometry args={[0.035, 0.24, 6, 10]} />
-        <meshStandardMaterial color="#f1c27d" roughness={0.8} />
-      </mesh>
+      <group ref={leftThighRef} position={[-0.085, 0.12, 0]}>
+        <mesh position={[0, -0.12, 0]}>
+          <capsuleGeometry args={[0.038, 0.24, 6, 10]} />
+          <meshStandardMaterial color="#111827" roughness={0.72} />
+        </mesh>
+        <group ref={leftCalfRef} position={[0, -0.24, 0]}>
+          <mesh position={[0, -0.12, 0]}>
+            <capsuleGeometry args={[0.034, 0.24, 6, 10]} />
+            <meshStandardMaterial color="#111827" roughness={0.72} />
+          </mesh>
+          <mesh position={[0, -0.28, -0.03]}>
+            <boxGeometry args={[0.09, 0.04, 0.16]} />
+            <meshStandardMaterial color="#1f2937" roughness={0.7} />
+          </mesh>
+        </group>
+      </group>
 
-      <mesh position={[-0.08, -0.14, 0]} rotation={[0, 0, 0.02]}>
-        <capsuleGeometry args={[0.04, 0.32, 6, 10]} />
-        <meshStandardMaterial color="#111827" roughness={0.7} />
-      </mesh>
-      <mesh position={[0.08, -0.14, 0]} rotation={[0, 0, -0.02]}>
-        <capsuleGeometry args={[0.04, 0.32, 6, 10]} />
-        <meshStandardMaterial color="#111827" roughness={0.7} />
-      </mesh>
+      <group ref={rightThighRef} position={[0.085, 0.12, 0]}>
+        <mesh position={[0, -0.12, 0]}>
+          <capsuleGeometry args={[0.038, 0.24, 6, 10]} />
+          <meshStandardMaterial color="#111827" roughness={0.72} />
+        </mesh>
+        <group ref={rightCalfRef} position={[0, -0.24, 0]}>
+          <mesh position={[0, -0.12, 0]}>
+            <capsuleGeometry args={[0.034, 0.24, 6, 10]} />
+            <meshStandardMaterial color="#111827" roughness={0.72} />
+          </mesh>
+          <mesh position={[0, -0.28, -0.03]}>
+            <boxGeometry args={[0.09, 0.04, 0.16]} />
+            <meshStandardMaterial color="#1f2937" roughness={0.7} />
+          </mesh>
+        </group>
+      </group>
 
       {action === '喝茶' && (
-        <group position={[0.25, 0.48, -0.05]}>
+        <group position={[0.28, 0.42, -0.08]}>
           <mesh>
             <cylinderGeometry args={[0.05, 0.045, 0.11, 14]} />
             <meshStandardMaterial color="#f59e0b" roughness={0.75} />
@@ -319,7 +463,7 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
         </group>
       )}
 
-      <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={ringRef} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.22, 0.31, 32]} />
         <meshStandardMaterial color={hovered ? '#f59e0b' : accent.glow} transparent opacity={0.7} />
       </mesh>
