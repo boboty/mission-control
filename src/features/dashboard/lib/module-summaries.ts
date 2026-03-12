@@ -111,16 +111,17 @@ export function getEventSummary(events: Event[]) {
 }
 
 export function getAgentSummary(agents: Agent[]) {
-  const onlineCount = agents.filter((agent) => ACTIVE_AGENT_STATES.has(agent.state)).length;
-  const idleCount = agents.filter((agent) => IDLE_AGENT_STATES.has(agent.state)).length;
-  const offlineCount = Math.max(agents.length - onlineCount - idleCount, 0);
-  const latestSeenAt = agents
+  const rosterAgents = agents.filter((agent) => agent.agent_key !== 'boss');
+  const onlineCount = rosterAgents.filter((agent) => ACTIVE_AGENT_STATES.has(agent.state)).length;
+  const idleCount = rosterAgents.filter((agent) => IDLE_AGENT_STATES.has(agent.state)).length;
+  const offlineCount = Math.max(rosterAgents.length - onlineCount - idleCount, 0);
+  const latestSeenAt = rosterAgents
     .map((agent) => parseDate(agent.last_seen_at))
     .filter((value): value is Date => Boolean(value))
     .sort((left, right) => right.getTime() - left.getTime())[0] || null;
 
   return {
-    total: agents.length,
+    total: rosterAgents.length,
     onlineCount,
     idleCount,
     offlineCount,

@@ -21,6 +21,7 @@ interface TeamOverviewProps {
   agents: Agent[];
   openDetail: (data: DetailData) => void;
   showScene?: boolean;
+  onOperatorActionChange: (action: OperatorAction) => void | Promise<void>;
 }
 
 interface OperatorProfile {
@@ -316,7 +317,19 @@ function getOperatorTone(action: OperatorAction) {
   return 'bg-blue-500/12 text-blue-700 dark:text-blue-300';
 }
 
-function OperatorCard({ profile, onClick }: { profile: OperatorProfile; onClick: () => void }) {
+function OperatorCard({
+  profile,
+  pendingAction,
+  onClick,
+  onActionChange,
+}: {
+  profile: OperatorProfile;
+  pendingAction: OperatorAction | null;
+  onClick: () => void;
+  onActionChange: (action: OperatorAction) => void;
+}) {
+  const actionOptions: OperatorAction[] = ['工作', '喝茶', '巡视'];
+
   return (
     <ClickableItem onClick={onClick} className="-mx-2 rounded-xl px-2 group">
       <div className="rounded-2xl border border-[var(--border-light)] bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(248,250,252,0.9))] p-4 transition-all duration-200 hover:border-amber-400/50 hover:shadow-sm dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.12),rgba(15,23,42,0.9))]">
@@ -357,6 +370,32 @@ function OperatorCard({ profile, onClick }: { profile: OperatorProfile; onClick:
         <div className="mt-3 rounded-xl border border-[var(--border-light)] bg-white/70 p-3 text-xs leading-5 text-[var(--text-secondary)] dark:bg-slate-900/55">
           {profile.detail}
         </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {actionOptions.map((action) => {
+            const active = profile.action === action;
+            const loading = pendingAction === action;
+
+            return (
+              <button
+                key={action}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!loading && !active) onActionChange(action);
+                }}
+                disabled={Boolean(pendingAction) || active}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  active
+                    ? 'border-amber-400/60 bg-amber-400/15 text-amber-700 dark:text-amber-300'
+                    : 'border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:border-[var(--color-primary)]/40 hover:text-[var(--text-primary)]'
+                } ${pendingAction ? 'cursor-wait opacity-80' : ''}`}
+              >
+                {loading ? `${action}中...` : active ? `${action}中` : `切到${action}`}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </ClickableItem>
   );
@@ -396,9 +435,10 @@ function SignalsPanel({ signals }: { signals: TeamSignal[] }) {
   );
 }
 
-export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverviewProps) {
+export function TeamOverview({ agents, openDetail, showScene = true, onOperatorActionChange }: TeamOverviewProps) {
   const [activeTab, setActiveTab] = useState<'roster' | 'signals'>('roster');
   const [forceAllOnlinePreview, setForceAllOnlinePreview] = useState(false);
+  const [pendingAction, setPendingAction] = useState<OperatorAction | null>(null);
   const rosterAgents = useMemo(() => agents.filter((agent) => !isBossAgent(agent.agent_key)), [agents]);
   const operatorProfile = useMemo(() => deriveOperatorProfile(agents), [agents]);
   const { insights, summary, signals } = useMemo(() => buildTeamInsights(rosterAgents), [rosterAgents]);
@@ -414,6 +454,15 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
     }),
     [insights]
   );
+
+  const handleOperatorActionChange = async (action: OperatorAction) => {
+    setPendingAction(action);
+    try {
+      await onOperatorActionChange(action);
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   if (rosterAgents.length === 0) {
     return <EmptyState moduleType="agents" icon="empty-team" title="暂无智能体" description="还没有注册的智能体" />;
@@ -461,7 +510,12 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
                   <p className="text-xs text-[var(--text-muted)]">Boss 作为操作者单独呈现，不再混入 agent roster。</p>
                 </div>
               </div>
-              <OperatorCard profile={operatorProfile} onClick={() => openDetail(operatorToDetail(operatorProfile))} />
+              <OperatorCard
+                profile={operatorProfile}
+                pendingAction={pendingAction}
+                onClick={() => openDetail(operatorToDetail(operatorProfile))}
+                onActionChange={(action) => void handleOperatorActionChange(action)}
+              />
             </div>
 
             <div className="mb-2 flex items-center justify-between gap-2 px-1">

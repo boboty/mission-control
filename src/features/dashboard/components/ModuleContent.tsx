@@ -52,6 +52,7 @@ export interface ModuleContentProps {
   memoryTopics: MemoryTopic[];
   onOpenDetail: (data: DetailData) => void | Promise<void>;
   onCreateEvent: (eventData: { title: string; starts_at: string; ends_at?: string; type?: string }) => void | Promise<void>;
+  onOperatorActionChange: (action: '工作' | '喝茶' | '巡视') => void | Promise<void>;
 }
 
 function TaskGroup({
@@ -127,6 +128,7 @@ export function ModuleContent({
   memoryTopics,
   onOpenDetail,
   onCreateEvent,
+  onOperatorActionChange,
 }: ModuleContentProps) {
   const [topicLoading, setTopicLoading] = useState(false);
 
@@ -273,7 +275,7 @@ export function ModuleContent({
       );
 
     case 'agents':
-      return <TeamOverview agents={agents} openDetail={onOpenDetail} showScene={isSingleModule} />;
+      return <TeamOverview agents={agents} openDetail={onOpenDetail} showScene={isSingleModule} onOperatorActionChange={onOperatorActionChange} />;
 
     case 'memory_topics':
       if (topicLoading) {

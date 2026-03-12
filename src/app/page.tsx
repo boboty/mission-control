@@ -88,6 +88,7 @@ export default function Dashboard() {
     memoryTopics: dashboard.memoryTopics,
     onOpenDetail: openDetail,
     onCreateEvent: dashboard.createEvent,
+    onOperatorActionChange: dashboard.updateOperatorStatus,
   };
 
   const hasValidationWarnings = useMemo(
@@ -238,7 +239,7 @@ export default function Dashboard() {
               pipelinesCount={dashboard.pipelines.length}
               eventPagination={dashboard.eventPagination}
               memoryTopicsCount={dashboard.memoryTopics.length}
-              agentsCount={dashboard.agents.length}
+              agentsCount={dashboard.agents.filter((agent) => agent.agent_key !== 'boss').length}
               healthCount={dashboard.health.length}
             />
           )}

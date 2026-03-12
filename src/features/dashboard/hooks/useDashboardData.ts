@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 
 const AUTO_REFRESH_INTERVAL = 60_000;
 const AGENT_REFRESH_INTERVAL = 5_000;
+const OPERATOR_KEY = 'boss';
 const DEFAULT_DECISION_SUMMARY: DecisionSummary = { total: 0, highPriority: 0, overdue: 0, blocked: 0 };
 const DEFAULT_METRICS_STATE = {
   metrics: { total: 0, inProgress: 0, blocked: 0, pending: 0 },
@@ -25,6 +26,28 @@ function getLatestSyncTime(payloads: Array<{ last_sync_at?: string }>) {
   return syncCandidates.length > 0
     ? syncCandidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
     : new Date().toISOString();
+}
+
+function buildOptimisticOperator(action: '工作' | '喝茶' | '巡视', previous?: Agent): Agent {
+  const now = new Date().toISOString();
+  const state = action === '工作' ? 'running' : action === '喝茶' ? 'idle' : 'online';
+
+  return {
+    id: previous?.id ?? -999,
+    agent_key: OPERATOR_KEY,
+    display_name: previous?.display_name || '一波',
+    description: previous?.description || '操作者，不纳入 agent roster',
+    state,
+    last_seen_at: now,
+    status_source: 'operator_manual',
+    current_task: action,
+    work_started_at: action === '工作' ? now : previous?.work_started_at || null,
+    last_idle_at: action === '喝茶' ? now : previous?.last_idle_at || null,
+    presence: 'online',
+    work_state: state,
+    freshness_level: 'fresh',
+    freshness_label: '1 小时内',
+  };
 }
 
 export function useDashboardData() {
@@ -112,6 +135,40 @@ export function useDashboardData() {
       console.error('Failed to fetch decisions:', fetchError);
     }
   }, []);
+
+  const updateOperatorStatus = useCallback(async (action: '工作' | '喝茶' | '巡视') => {
+    const previousOperator = agents.find((agent) => agent.agent_key === OPERATOR_KEY);
+    const optimisticOperator = buildOptimisticOperator(action, previousOperator);
+    latestAgentRequestId.current += 1;
+
+    setAgents((current) => {
+      const next = current.filter((agent) => agent.agent_key !== OPERATOR_KEY);
+      return [optimisticOperator, ...next];
+    });
+    setLastUpdated(optimisticOperator.last_seen_at);
+
+    try {
+      const res = await fetch('/api/user/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to update operator status');
+      }
+
+      void fetchAgents();
+    } catch (error) {
+      setAgents((current) => {
+        const next = current.filter((agent) => agent.agent_key !== OPERATOR_KEY);
+        return previousOperator ? [previousOperator, ...next] : next;
+      });
+      alert(error instanceof Error ? error.message : '更新操作者状态失败');
+      throw error;
+    }
+  }, [agents, fetchAgents]);
 
   const fetchTasks = useCallback(async (page = 1) => {
     setTaskLoading(true);
@@ -455,6 +512,7 @@ export function useDashboardData() {
     refreshDecisions,
     resolveDecision,
     createEvent,
+    updateOperatorStatus,
     fetchTasks,
     handleTaskPageChange,
     handleEventPageChange,
