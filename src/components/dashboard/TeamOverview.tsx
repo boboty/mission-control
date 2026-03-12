@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { ClickableItem, EmptyState, StatusBadge, type DetailData } from '@/components';
-import { agentToDetail } from '@/lib/data-utils';
+import { agentToDetail, formatDate } from '@/lib/data-utils';
 import { type Agent } from '@/lib/types';
 import { buildTeamInsights, type EvidenceSourceType, type FreshnessLevel, type TeamAgentInsight, type TeamSignal } from '@/features/dashboard/lib/team-insights';
 import dynamic from 'next/dynamic';
+import type { OperatorAction } from './OfficeScene';
 
 const OfficeScene = dynamic(() => import('./OfficeScene'), {
   ssr: false,
@@ -22,6 +23,22 @@ interface TeamOverviewProps {
   showScene?: boolean;
 }
 
+interface OperatorProfile {
+  name: string;
+  action: OperatorAction;
+  summary: string;
+  detail: string;
+  source: 'runtime' | 'inferred';
+  lastSeenAt: string | null;
+  currentTask: string | null;
+}
+
+const OPERATOR_NAME = '一波';
+
+function isBossAgent(agentKey: string) {
+  return agentKey === 'boss';
+}
+
 function getAvatarUrl(agentKey: string) {
   return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(agentKey)}&backgroundColor=1a1a2e`;
 }
@@ -36,6 +53,76 @@ function isIdle(state: string | null | undefined) {
 
 function isOffline(state: string | null | undefined) {
   return state === 'offline' || !state;
+}
+
+function normalizeOperatorAction(value: string | null | undefined): OperatorAction | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+
+  if (['working', 'running', 'work', '工作'].includes(normalized)) return '工作';
+  if (normalized.includes('tea') || normalized.includes('break') || normalized.includes('喝茶') || normalized.includes('休息')) return '喝茶';
+  if (normalized.includes('patrol') || normalized.includes('walk') || normalized.includes('巡视') || normalized.includes('巡检')) return '巡视';
+
+  return null;
+}
+
+function deriveOperatorProfile(agents: Agent[]): OperatorProfile {
+  const bossAgent = agents.find((agent) => isBossAgent(agent.agent_key));
+  const rosterAgents = agents.filter((agent) => !isBossAgent(agent.agent_key));
+  const explicitAction = normalizeOperatorAction(bossAgent?.current_task) || normalizeOperatorAction(bossAgent?.state);
+  const activeAgents = rosterAgents.filter((agent) => isOnline(agent.state) && agent.presence !== 'offline').length;
+  const busyAgents = rosterAgents.filter((agent) => agent.state === 'running' || agent.state === 'working').length;
+
+  const action = explicitAction || (busyAgents >= 2 ? '巡视' : activeAgents === 0 ? '喝茶' : '工作');
+  const source = explicitAction ? 'runtime' : 'inferred';
+  const detail = source === 'runtime'
+    ? `来自运行态信号，当前动作为「${action}」${bossAgent?.current_task ? `，任务：${bossAgent.current_task}` : ''}。`
+    : `当前没有独立的操作者状态上报，基于团队运行态推断为「${action}」：${busyAgents >= 2 ? '有多个 agent 正在执行任务，操作者更可能在巡视协调。' : activeAgents === 0 ? '当前没有活跃 agent，操作者更可能处于短暂放松状态。' : '当前团队有在线 agent，操作者更可能在处理本轮工作。'}`;
+
+  return {
+    name: bossAgent?.display_name || OPERATOR_NAME,
+    action,
+    summary: `操作者，不计入 agent roster，当前${action}${source === 'inferred' ? '（推断）' : ''}。`,
+    detail,
+    source,
+    lastSeenAt: bossAgent?.last_seen_at || null,
+    currentTask: bossAgent?.current_task || null,
+  };
+}
+
+function operatorToDetail(profile: OperatorProfile): DetailData {
+  const updatedAt = profile.lastSeenAt || new Date().toISOString();
+
+  return {
+    id: 'operator-boss',
+    type: 'agent',
+    title: profile.name,
+    status: profile.action,
+    owner: '操作者',
+    description: profile.summary,
+    notes: profile.detail,
+    updatedAt,
+    lastSeenAt: profile.lastSeenAt || undefined,
+    extra: {
+      role: 'operator',
+      source: profile.source,
+      current_task: profile.currentTask,
+    },
+    metadata: {
+      tags: ['操作者', '非 Agent'],
+      customFields: {
+        source: profile.source,
+      },
+    },
+    timeline: [
+      {
+        timestamp: updatedAt,
+        type: 'updated',
+        title: '操作者状态',
+        description: `${profile.action}${profile.currentTask ? ` · ${profile.currentTask}` : ''}`,
+      },
+    ],
+  };
 }
 
 function getPresenceLabel(state: string | null | undefined, presence?: string | null) {
@@ -223,6 +310,58 @@ function AgentItem({ insight, onClick }: { insight: TeamAgentInsight; onClick: (
   );
 }
 
+function getOperatorTone(action: OperatorAction) {
+  if (action === '工作') return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+  if (action === '喝茶') return 'bg-violet-500/12 text-violet-700 dark:text-violet-300';
+  return 'bg-blue-500/12 text-blue-700 dark:text-blue-300';
+}
+
+function OperatorCard({ profile, onClick }: { profile: OperatorProfile; onClick: () => void }) {
+  return (
+    <ClickableItem onClick={onClick} className="-mx-2 rounded-xl px-2 group">
+      <div className="rounded-2xl border border-[var(--border-light)] bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(248,250,252,0.9))] p-4 transition-all duration-200 hover:border-amber-400/50 hover:shadow-sm dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.12),rgba(15,23,42,0.9))]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-400/60 bg-white/80 text-lg font-semibold text-amber-700 dark:bg-slate-900/70 dark:text-amber-300">
+              波
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{profile.name}</span>
+                <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-white/70 px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)] dark:bg-slate-900/60">
+                  operator
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getOperatorTone(profile.action)}`}>
+                  {profile.action}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                <span>操作者</span>
+                <span>·</span>
+                <span>不计入 Agent 指标</span>
+                <span>·</span>
+                <span>{profile.source === 'runtime' ? '运行态' : '推断态'}</span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">{profile.summary}</p>
+            </div>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <div className="text-sm font-semibold text-amber-700 dark:text-amber-300">{profile.currentTask || profile.action}</div>
+            <div className="mt-1 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              {profile.lastSeenAt ? formatDate(profile.lastSeenAt) : '未单独上报'}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-[var(--border-light)] bg-white/70 p-3 text-xs leading-5 text-[var(--text-secondary)] dark:bg-slate-900/55">
+          {profile.detail}
+        </div>
+      </div>
+    </ClickableItem>
+  );
+}
+
 function SignalsPanel({ signals }: { signals: TeamSignal[] }) {
   if (signals.length === 0) {
     return (
@@ -259,8 +398,10 @@ function SignalsPanel({ signals }: { signals: TeamSignal[] }) {
 
 export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverviewProps) {
   const [activeTab, setActiveTab] = useState<'roster' | 'signals'>('roster');
-  const [forceAllOnlinePreview, setForceAllOnlinePreview] = useState(true);
-  const { insights, summary, signals } = useMemo(() => buildTeamInsights(agents), [agents]);
+  const [forceAllOnlinePreview, setForceAllOnlinePreview] = useState(false);
+  const rosterAgents = useMemo(() => agents.filter((agent) => !isBossAgent(agent.agent_key)), [agents]);
+  const operatorProfile = useMemo(() => deriveOperatorProfile(agents), [agents]);
+  const { insights, summary, signals } = useMemo(() => buildTeamInsights(rosterAgents), [rosterAgents]);
   const sortedInsights = useMemo(
     () => [...insights].sort((left, right) => {
       // 在线优先，然后空闲，最后离线
@@ -274,14 +415,14 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
     [insights]
   );
 
-  if (agents.length === 0) {
+  if (rosterAgents.length === 0) {
     return <EmptyState moduleType="agents" icon="empty-team" title="暂无智能体" description="还没有注册的智能体" />;
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <SummaryCard label="在线" value={String(summary.onlineCount)} description="当前可立即调度的 agent" valueClassName="text-emerald-700 dark:text-emerald-300" />
+        <SummaryCard label="在线" value={String(summary.onlineCount)} description="当前可立即调度的 agent（不含操作者）" valueClassName="text-emerald-700 dark:text-emerald-300" />
         <SummaryCard label="24h 活跃" value={String(summary.active24hCount)} description="最近 24 小时内有运行态证据" valueClassName="text-blue-700 dark:text-blue-300" />
         <SummaryCard label="健康" value={String(summary.healthyCount)} description="Health ≥ 75 且无 blocker" valueClassName="text-emerald-700 dark:text-emerald-300" />
         <SummaryCard label="异常关注" value={String(summary.attentionCount)} description="存在 warning / blocker 或评分偏低" valueClassName="text-amber-700 dark:text-amber-300" />
@@ -313,6 +454,23 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
 
         {activeTab === 'roster' ? (
           <div className="mt-4">
+            <div className="mb-4">
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Operator</h4>
+                  <p className="text-xs text-[var(--text-muted)]">Boss 作为操作者单独呈现，不再混入 agent roster。</p>
+                </div>
+              </div>
+              <OperatorCard profile={operatorProfile} onClick={() => openDetail(operatorToDetail(operatorProfile))} />
+            </div>
+
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Agents</h4>
+                <p className="text-xs text-[var(--text-muted)]">仅展示 agent roster 与运行态证据。</p>
+              </div>
+              <div className="text-xs text-[var(--text-muted)]">{sortedInsights.length} 个</div>
+            </div>
             {sortedInsights.map((insight) => (
               <AgentItem key={insight.agent.id} insight={insight} onClick={() => openDetail(enhanceAgentDetail(insight))} />
             ))}
@@ -347,15 +505,21 @@ export function TeamOverview({ agents, openDetail, showScene = true }: TeamOverv
                   onChange={(event) => setForceAllOnlinePreview(event.target.checked)}
                   className="h-4 w-4 rounded border-[var(--border-light)]"
                 />
-                全员在线预览
+                全员在线预览（模拟）
               </label>
               <div className="text-xs text-[var(--text-muted)]">拖动旋转 · 滚轮缩放</div>
             </div>
           </div>
-          <OfficeScene agents={sortedInsights.map((item) => item.agent)} forceAllOnline={forceAllOnlinePreview} onAgentClick={(agent) => {
-            const insight = sortedInsights.find((item) => item.agent.id === agent.id);
-            openDetail(insight ? enhanceAgentDetail(insight) : agentToDetail(agent));
-          }} />
+          <OfficeScene
+            agents={sortedInsights.map((item) => item.agent)}
+            operatorAction={operatorProfile.action}
+            forceAllOnline={forceAllOnlinePreview}
+            onOperatorClick={() => openDetail(operatorToDetail(operatorProfile))}
+            onAgentClick={(agent) => {
+              const insight = sortedInsights.find((item) => item.agent.id === agent.id);
+              openDetail(insight ? enhanceAgentDetail(insight) : agentToDetail(agent));
+            }}
+          />
         </div>
       )}
     </div>

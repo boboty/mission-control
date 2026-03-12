@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { aggregateAlerts, type Alert } from '@/components';
 import { getMonthRange } from '@/lib/calendar-utils';
@@ -10,6 +10,7 @@ import { KANBAN_COLUMNS, type Agent, type Decision, type DecisionSummary, type E
 import { supabase } from '@/lib/supabase';
 
 const AUTO_REFRESH_INTERVAL = 60_000;
+const AGENT_REFRESH_INTERVAL = 5_000;
 const DEFAULT_DECISION_SUMMARY: DecisionSummary = { total: 0, highPriority: 0, overdue: 0, blocked: 0 };
 const DEFAULT_METRICS_STATE = {
   metrics: { total: 0, inProgress: 0, blocked: 0, pending: 0 },
@@ -50,22 +51,45 @@ export function useDashboardData() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [dataValidation, setDataValidation] = useState<Record<string, { valid: boolean; warnings: string[] }>>({});
   const [metricsState, setMetricsState] = useState(DEFAULT_METRICS_STATE);
+  const latestAgentRequestId = useRef(0);
 
   const dataSource = 'Supabase';
   const autoRefreshEnabled = true;
   const taskSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+  const applyAgentPayload = useCallback((requestId: number, data: any) => {
+    if (requestId !== latestAgentRequestId.current) return;
+
+    if (data.agents) {
+      setAgents(data.agents);
+    }
+
+    const syncTime =
+      data?.meta?.data_updated_at ||
+      data?.meta?.last_sync_at ||
+      data?.data_updated_at ||
+      data?.last_sync_at ||
+      data?.agents?.[0]?.last_seen_at;
+
+    if (syncTime) {
+      setLastUpdated((current) => {
+        if (!current) return syncTime;
+        return new Date(syncTime).getTime() > new Date(current).getTime() ? syncTime : current;
+      });
+    }
+  }, []);
+
   const fetchAgents = useCallback(async () => {
+    const requestId = ++latestAgentRequestId.current;
+
     try {
-      const res = await fetch('/api/agents');
+      const res = await fetch('/api/agents', { cache: 'no-store' });
       const data = await res.json();
-      if (data.agents) {
-        setAgents(data.agents);
-      }
+      applyAgentPayload(requestId, data);
     } catch (fetchError) {
       console.error('Failed to fetch agents:', fetchError);
     }
-  }, []);
+  }, [applyAgentPayload]);
 
   const refreshDecisions = useCallback(async () => {
     try {
@@ -147,6 +171,8 @@ export function useDashboardData() {
       setIsRefreshing(true);
     }
 
+    const agentRequestId = ++latestAgentRequestId.current;
+
     try {
       const eventsInitParams = new URLSearchParams({
         page: '1',
@@ -160,7 +186,7 @@ export function useDashboardData() {
         fetch('/api/tasks?page=1&pageSize=20'),
         fetch('/api/pipelines'),
         fetch(`/api/events?${eventsInitParams.toString()}`),
-        fetch('/api/agents'),
+        fetch('/api/agents', { cache: 'no-store' }),
         fetch('/api/memory-topics'),
         fetch('/api/health'),
         fetch('/api/metrics'),
@@ -195,9 +221,7 @@ export function useDashboardData() {
         setEventPagination(eventsData.pagination);
       }
 
-      if (agentsData.agents) {
-        setAgents(agentsData.agents);
-      }
+      applyAgentPayload(agentRequestId, agentsData);
 
       if (memoryTopicsData?.topics) {
         setMemoryTopics(memoryTopicsData.topics);
@@ -241,7 +265,7 @@ export function useDashboardData() {
       setIsRefreshing(false);
       setLoading(false);
     }
-  }, []);
+  }, [applyAgentPayload]);
 
   const createEvent = useCallback(async (eventData: { title: string; starts_at: string; ends_at?: string; type?: string }) => {
     try {
@@ -351,6 +375,29 @@ export function useDashboardData() {
   }, [refreshAllData]);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void fetchAgents();
+      }
+    }, AGENT_REFRESH_INTERVAL);
+
+    const refreshVisibleAgents = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchAgents();
+      }
+    };
+
+    window.addEventListener('focus', refreshVisibleAgents);
+    document.addEventListener('visibilitychange', refreshVisibleAgents);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refreshVisibleAgents);
+      document.removeEventListener('visibilitychange', refreshVisibleAgents);
+    };
+  }, [fetchAgents]);
+
+  useEffect(() => {
     const supabaseClient = supabase;
     if (!supabaseClient) return;
 
@@ -359,7 +406,11 @@ export function useDashboardData() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, () => {
         void fetchAgents();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void fetchAgents();
+        }
+      });
 
     return () => {
       void supabaseClient.removeChannel(channel);

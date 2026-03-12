@@ -225,7 +225,7 @@ export async function GET() {
       dataUpdatedAt: agents[0]?.last_seen_at || new Date().toISOString(),
     });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       withLegacyListShape({
         key: 'agents',
         rows: agents,
@@ -238,6 +238,8 @@ export async function GET() {
         },
       })
     );
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   } catch (error) {
     console.error('Failed to fetch agents:', error);
     return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 });

@@ -218,7 +218,7 @@ export function agentToDetail(agent: Agent): DetailData {
     type: 'agent',
     title: agent.display_name,
     status: agent.state,
-    lastSeenAt: agent.last_seen_at,
+    lastSeenAt: agent.last_seen_at || undefined,
     extra: {
       agent_key: agent.agent_key,
     },

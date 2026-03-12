@@ -6,6 +6,11 @@ import { OrbitControls, Float, Text, RoundedBox, Edges, Html, useCursor } from '
 import * as THREE from 'three';
 import { type Agent } from '@/lib/types';
 
+export type OperatorAction = '工作' | '喝茶' | '巡视';
+
+const OPERATOR_WORK_POSITION = new THREE.Vector3(0.1, 0.42, -5.05);
+const OPERATOR_TEA_POSITION = new THREE.Vector3(8.4, 0.42, -1.15);
+
 function isOnline(state: string): boolean {
   return state === 'online' || state === 'active' || state === 'running' || state === 'working';
 }
@@ -32,6 +37,12 @@ function getAgentPalette(index: number, online: boolean) {
   ];
   if (!online) return { body: '#6b7280', head: '#9ca3af', glow: '#4b5563' };
   return palettes[index % palettes.length];
+}
+
+function getOperatorAccent(action: OperatorAction) {
+  if (action === '工作') return { primary: '#10b981', glow: '#34d399' };
+  if (action === '喝茶') return { primary: '#8b5cf6', glow: '#c4b5fd' };
+  return { primary: '#3b82f6', glow: '#93c5fd' };
 }
 
 function AgentFigure({
@@ -197,6 +208,138 @@ function AgentFigure({
         <Html position={[0, 1.35, 0]} center distanceFactor={8}>
           <div className="px-3 py-1.5 bg-gray-900/90 text-white text-xs rounded-lg whitespace-nowrap backdrop-blur-sm border border-gray-700">
             {online ? '🟢 在线工作' : '⚪ 空闲等待'} · {variant}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?: () => void }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const leftArmRef = useRef<THREE.Mesh>(null);
+  const rightArmRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
+
+  const accent = getOperatorAccent(action);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+
+    const t = state.clock.getElapsedTime();
+    const position = groupRef.current.position;
+
+    if (action === '巡视') {
+      const patrolT = t * 0.42;
+      position.x = Math.sin(patrolT) * 4.4;
+      position.z = 0.45 + Math.cos(patrolT * 1.3) * 0.7;
+      position.y = 0.42 + Math.sin(t * 2.4) * 0.02;
+      groupRef.current.rotation.y = Math.PI / 2 - patrolT;
+    } else {
+      const target = action === '喝茶' ? OPERATOR_TEA_POSITION : OPERATOR_WORK_POSITION;
+      position.lerp(target, 0.08);
+      position.y = target.y + Math.sin(t * 2) * (action === '工作' ? 0.008 : 0.02);
+      groupRef.current.rotation.y = action === '工作' ? Math.PI : -Math.PI / 2.35;
+    }
+
+    if (leftArmRef.current) {
+      leftArmRef.current.rotation.z = action === '巡视'
+        ? Math.sin(t * 5) * 0.35
+        : action === '喝茶'
+          ? -0.35
+          : -0.15 + Math.sin(t * 7) * 0.08;
+    }
+
+    if (rightArmRef.current) {
+      rightArmRef.current.rotation.z = action === '喝茶'
+        ? -1.05 + Math.sin(t * 4) * 0.06
+        : action === '巡视'
+          ? -Math.sin(t * 5) * 0.35
+          : 0.18 + Math.sin(t * 7 + 0.4) * 0.08;
+    }
+  });
+
+  return (
+    <group
+      ref={groupRef}
+      position={[OPERATOR_WORK_POSITION.x, OPERATOR_WORK_POSITION.y, OPERATOR_WORK_POSITION.z]}
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      onClick={onClick}
+    >
+      <mesh position={[0, 0.7, 0]}>
+        <sphereGeometry args={[0.16, 18, 18]} />
+        <meshStandardMaterial color="#f1c27d" roughness={0.75} />
+      </mesh>
+
+      <mesh position={[0, 0.95, -0.02]}>
+        <sphereGeometry args={[0.17, 18, 18]} />
+        <meshStandardMaterial color="#111827" roughness={0.45} />
+      </mesh>
+
+      <mesh position={[0, 0.36, 0]}>
+        <capsuleGeometry args={[0.12, 0.34, 8, 14]} />
+        <meshStandardMaterial color={accent.primary} roughness={0.55} />
+      </mesh>
+
+      <mesh position={[0, 0.13, 0]}>
+        <sphereGeometry args={[0.18, 18, 18]} />
+        <meshStandardMaterial color="#111827" roughness={0.7} />
+      </mesh>
+
+      <mesh ref={leftArmRef} position={[-0.18, 0.42, 0]} rotation={[0, 0, -0.2]}>
+        <capsuleGeometry args={[0.035, 0.24, 6, 10]} />
+        <meshStandardMaterial color="#f1c27d" roughness={0.8} />
+      </mesh>
+      <mesh ref={rightArmRef} position={[0.18, 0.42, 0]} rotation={[0, 0, 0.2]}>
+        <capsuleGeometry args={[0.035, 0.24, 6, 10]} />
+        <meshStandardMaterial color="#f1c27d" roughness={0.8} />
+      </mesh>
+
+      <mesh position={[-0.08, -0.14, 0]} rotation={[0, 0, 0.02]}>
+        <capsuleGeometry args={[0.04, 0.32, 6, 10]} />
+        <meshStandardMaterial color="#111827" roughness={0.7} />
+      </mesh>
+      <mesh position={[0.08, -0.14, 0]} rotation={[0, 0, -0.02]}>
+        <capsuleGeometry args={[0.04, 0.32, 6, 10]} />
+        <meshStandardMaterial color="#111827" roughness={0.7} />
+      </mesh>
+
+      {action === '喝茶' && (
+        <group position={[0.25, 0.48, -0.05]}>
+          <mesh>
+            <cylinderGeometry args={[0.05, 0.045, 0.11, 14]} />
+            <meshStandardMaterial color="#f59e0b" roughness={0.75} />
+          </mesh>
+          <mesh position={[0.05, 0.01, 0]}>
+            <torusGeometry args={[0.03, 0.008, 8, 16]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.6} />
+          </mesh>
+        </group>
+      )}
+
+      <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.22, 0.31, 32]} />
+        <meshStandardMaterial color={hovered ? '#f59e0b' : accent.glow} transparent opacity={0.7} />
+      </mesh>
+
+      <Text
+        position={[0, 1.25, 0]}
+        fontSize={0.14}
+        color={hovered ? '#fbbf24' : accent.primary}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.012}
+        outlineColor="#000000"
+      >
+        一波 · {action}
+      </Text>
+
+      {hovered && (
+        <Html position={[0, 1.5, 0]} center distanceFactor={8}>
+          <div className="rounded-lg border border-gray-700 bg-gray-900/90 px-3 py-1.5 text-xs text-white backdrop-blur-sm">
+            操作者 · {action}
           </div>
         </Html>
       )}
@@ -485,14 +628,8 @@ function Decor() {
   );
 }
 
-function BossOffice({ position, state }: { position: [number, number, number]; state: string }) {
-  const stateColors: Record<string, string> = {
-    working: '#10b981',
-    外出: '#f59e0b',
-    喝茶: '#8b5cf6',
-    巡视: '#3b82f6',
-  };
-  const accentColor = stateColors[state] || '#10b981';
+function BossOffice({ position, action }: { position: [number, number, number]; action: OperatorAction }) {
+  const accentColor = getOperatorAccent(action).primary;
 
   return (
     <group position={position} rotation={[0, Math.PI, 0]}>
@@ -588,13 +725,23 @@ function BossOffice({ position, state }: { position: [number, number, number]; s
         <mesh position={[0.18, 0.16, -0.12]}><cylinderGeometry args={[0.02, 0.02, 0.3, 6]} /><meshStandardMaterial color="#374151" /></mesh>
       </group>
 
-      <Text position={[0, 2, -0.5]} fontSize={0.22} color={accentColor} anchorX="center" outlineWidth={0.015} outlineColor="#000">一波</Text>
-      <Text position={[0, 1.7, -0.5]} fontSize={0.13} color="#64748b" anchorX="center">{state === 'working' ? '💻 工作' : state === '外出' ? '🚗 外出' : state === '喝茶' ? '☕ 喝茶' : '🔍 巡视'}</Text>
+      <Text position={[0, 2, -0.5]} fontSize={0.22} color={accentColor} anchorX="center" outlineWidth={0.015} outlineColor="#000">操作者</Text>
+      <Text position={[0, 1.7, -0.5]} fontSize={0.13} color="#64748b" anchorX="center">当前动作 · {action}</Text>
     </group>
   );
 }
 
-function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick?: (agent: Agent) => void }) {
+function OfficeContent({
+  agents,
+  operatorAction,
+  onAgentClick,
+  onOperatorClick,
+}: {
+  agents: Agent[];
+  operatorAction: OperatorAction;
+  onAgentClick?: (agent: Agent) => void;
+  onOperatorClick?: () => void;
+}) {
   const rosterAgents = agents.filter((a) => !isBoss(a.agent_key));
   const cols = 3;
   const rows = 2;
@@ -614,7 +761,8 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
       <FloorPattern />
       <Walls />
       <Decor />
-      <BossOffice position={[0, 0, -5.1]} state="working" />
+      <BossOffice position={[0, 0, -5.1]} action={operatorAction} />
+      <OperatorFigure action={operatorAction} onClick={onOperatorClick} />
 
       {Array.from({ length: maxSeats }).map((_, index) => {
         const agent = rosterAgents[index];
@@ -680,10 +828,18 @@ function OfficeContent({ agents, onAgentClick }: { agents: Agent[]; onAgentClick
 interface OfficeSceneProps {
   agents: Agent[];
   onAgentClick?: (agent: Agent) => void;
+  onOperatorClick?: () => void;
   forceAllOnline?: boolean;
+  operatorAction?: OperatorAction;
 }
 
-export default function OfficeScene({ agents, onAgentClick, forceAllOnline = false }: OfficeSceneProps) {
+export default function OfficeScene({
+  agents,
+  onAgentClick,
+  onOperatorClick,
+  forceAllOnline = false,
+  operatorAction = '巡视',
+}: OfficeSceneProps) {
   const visibleAgents = useMemo(() => agents.filter((a) => !isBoss(a.agent_key)).length, [agents]);
   const sceneAgents = useMemo(
     () => forceAllOnline ? agents.map((agent) => (isBoss(agent.agent_key) ? agent : { ...agent, state: 'online' })) : agents,
@@ -696,11 +852,16 @@ export default function OfficeScene({ agents, onAgentClick, forceAllOnline = fal
         🖱️ 拖动旋转 · 滚轮缩放 · 点击查看
       </div>
       <div className="absolute top-3 right-3 z-10 px-2 py-1 bg-white/80 text-slate-600 text-xs rounded shadow-sm backdrop-blur-sm">
-        已展示 {visibleAgents} 个 Agent · Boss 办公室保留{forceAllOnline ? ' · 全员在线预览' : ''}
+        已展示 {visibleAgents} 个 Agent + 1 位操作者{forceAllOnline ? ' · 全员在线预览' : ''}
       </div>
 
       <Canvas camera={{ position: [13, 10, 14], fov: 30 }} shadows gl={{ antialias: true }}>
-        <OfficeContent agents={sceneAgents} onAgentClick={onAgentClick} />
+        <OfficeContent
+          agents={sceneAgents}
+          operatorAction={operatorAction}
+          onAgentClick={onAgentClick}
+          onOperatorClick={onOperatorClick}
+        />
       </Canvas>
     </div>
   );

@@ -287,7 +287,7 @@ export function buildTeamAgentInsight(agent: Agent): TeamAgentInsight {
     statusEvidence: {
       label: 'Status',
       value: agent.state,
-      sourceType: agent.status_source || 'runtime',
+      sourceType: (agent.status_source as EvidenceSourceType | null | undefined) || 'runtime',
       sourceRef: 'public.agents.state',
       freshness: freshnessLevel,
       updatedAt: agent.last_seen_at,
