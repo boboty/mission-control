@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { type Agent } from '@/lib/types';
 
 export type OperatorAction = '工作' | '喝茶' | '巡视';
+type SceneControlMode = 'rotate' | 'pan';
 
 const OPERATOR_WORK_POSITION = new THREE.Vector3(0, 0.28, -5.82);
 const OPERATOR_TEA_POSITION = new THREE.Vector3(6.65, 0, -0.25);
@@ -285,7 +286,7 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
 
     if (torsoRef.current) {
       torsoRef.current.rotation.x = seated ? 0.15 : drinkingTea ? 0.03 : 0;
-      torsoRef.current.position.y = seated ? 0.02 : 0;
+      torsoRef.current.position.y = seated ? 0.02 : 0.06;
     }
     if (headRef.current) {
       headRef.current.rotation.x = seated ? -0.08 : drinkingTea ? 0.04 : 0;
@@ -294,10 +295,10 @@ function OperatorFigure({ action, onClick }: { action: OperatorAction; onClick?:
       ringRef.current.position.y = seated ? -0.25 : 0.03;
     }
     if (leftThighRef.current) {
-      leftThighRef.current.position.y = seated ? 0.12 : 0.4;
+      leftThighRef.current.position.y = seated ? 0.12 : 0.56;
     }
     if (rightThighRef.current) {
-      rightThighRef.current.position.y = seated ? 0.12 : 0.4;
+      rightThighRef.current.position.y = seated ? 0.12 : 0.56;
     }
     if (leftCalfRef.current) {
       leftCalfRef.current.position.z = seated ? 0.01 : 0;
@@ -890,11 +891,13 @@ function BossOffice({ position, action }: { position: [number, number, number]; 
 function OfficeContent({
   agents,
   operatorAction,
+  controlMode,
   onAgentClick,
   onOperatorClick,
 }: {
   agents: Agent[];
   operatorAction: OperatorAction;
+  controlMode: SceneControlMode;
   onAgentClick?: (agent: Agent) => void;
   onOperatorClick?: () => void;
 }) {
@@ -980,9 +983,9 @@ function OfficeContent({
         maxDistance={24}
         autoRotate={false}
         mouseButtons={{
-          LEFT: THREE.MOUSE.ROTATE,
+          LEFT: controlMode === 'rotate' ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
           MIDDLE: THREE.MOUSE.DOLLY,
-          RIGHT: THREE.MOUSE.PAN,
+          RIGHT: controlMode === 'rotate' ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
         }}
         target={[0, 1.2, Math.max(1, totalDepth / 3)]}
       />
@@ -1005,6 +1008,7 @@ export default function OfficeScene({
   forceAllOnline = false,
   operatorAction = '巡视',
 }: OfficeSceneProps) {
+  const [controlMode, setControlMode] = useState<SceneControlMode>('rotate');
   const visibleAgents = useMemo(() => agents.filter((a) => !isBoss(a.agent_key)).length, [agents]);
   const sceneAgents = useMemo(
     () => forceAllOnline ? agents.map((agent) => (isBoss(agent.agent_key) ? agent : { ...agent, state: 'online' })) : agents,
@@ -1012,9 +1016,32 @@ export default function OfficeScene({
   );
 
   return (
-    <div className="h-[560px] rounded-xl overflow-hidden border border-[var(--border-light)] bg-gradient-to-b from-slate-100 to-slate-200 relative">
+    <div
+      className="h-[560px] rounded-xl overflow-hidden border border-[var(--border-light)] bg-gradient-to-b from-slate-100 to-slate-200 relative"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-white/80 text-slate-600 text-xs rounded shadow-sm backdrop-blur-sm">
-        左键旋转 · 右键平移 · 滚轮缩放 · 点击查看
+        左键{controlMode === 'rotate' ? '旋转' : '移动'} · 滚轮缩放 · 点击查看
+      </div>
+      <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 rounded-xl border border-white/60 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() => setControlMode('rotate')}
+          className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+            controlMode === 'rotate' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200/70'
+          }`}
+        >
+          旋转
+        </button>
+        <button
+          type="button"
+          onClick={() => setControlMode('pan')}
+          className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+            controlMode === 'pan' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200/70'
+          }`}
+        >
+          移动
+        </button>
       </div>
       <div className="absolute top-3 right-3 z-10 px-2 py-1 bg-white/80 text-slate-600 text-xs rounded shadow-sm backdrop-blur-sm">
         已展示 {visibleAgents} 个 Agent + 1 位操作者{forceAllOnline ? ' · 全员在线预览' : ''}
@@ -1024,6 +1051,7 @@ export default function OfficeScene({
         <OfficeContent
           agents={sceneAgents}
           operatorAction={operatorAction}
+          controlMode={controlMode}
           onAgentClick={onAgentClick}
           onOperatorClick={onOperatorClick}
         />
