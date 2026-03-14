@@ -35,7 +35,7 @@ function samplePatrolPath(progress: number) {
 }
 
 function isOnline(state: string): boolean {
-  return state === 'online' || state === 'active' || state === 'running' || state === 'working';
+  return state === 'online' || state === 'active' || state === 'running' || state === 'working' || state === 'blocked';
 }
 
 function isBoss(agentKey: string): boolean {

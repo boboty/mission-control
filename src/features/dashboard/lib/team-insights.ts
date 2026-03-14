@@ -98,8 +98,18 @@ export function getFreshnessLabel(value?: string | null) {
   return `${Math.floor(hours / 24)} 天前`;
 }
 
-function isOnline(state?: string | null) {
-  return state === 'online' || state === 'active' || state === 'running' || state === 'working';
+function getWorkState(agent: Agent) {
+  if (agent.work_state) return agent.work_state;
+  if (agent.presence === 'offline' || agent.state === 'offline' || !agent.state) return 'offline';
+  if (agent.state === 'blocked') return 'blocked';
+  if (agent.state === 'running' || agent.state === 'working') return 'working';
+  if (agent.state === 'idle') return 'idle';
+  return 'idle';
+}
+
+function isOnline(agent: Agent) {
+  const workState = getWorkState(agent);
+  return workState === 'working' || workState === 'idle' || workState === 'blocked';
 }
 
 function inferRole(agent: Agent) {
@@ -167,7 +177,8 @@ function buildProtocolChecks(agent: Agent): ProtocolCheck[] {
 
 function buildSignals(agent: Agent, protocolChecks: ProtocolCheck[]): TeamSignal[] {
   const signals: TeamSignal[] = [];
-  const stale = getFreshnessLevel(agent.last_seen_at) === 'stale';
+  const workState = getWorkState(agent);
+  const stale = getFreshnessLevel(agent.last_seen_at) === 'stale' || workState === 'stale';
   const role = inferRole(agent);
   const missingProtocols = protocolChecks.filter((check) => !check.present && check.weight >= 10);
 
@@ -187,7 +198,7 @@ function buildSignals(agent: Agent, protocolChecks: ProtocolCheck[]): TeamSignal
       severity: 'warning',
       agentKey: agent.agent_key,
       title: '运行态数据过期',
-      description: '最近活跃时间超过 24 小时，当前状态可能不可靠。',
+      description: workState === 'stale' ? '最近只看到任务侧或旧状态信号，当前工作态已进入衰减区。' : '最近活跃时间超过 24 小时，当前状态可能不可靠。',
     });
   }
 
@@ -247,6 +258,7 @@ export function buildTeamAgentInsight(agent: Agent): TeamAgentInsight {
   const protocolChecks = buildProtocolChecks(agent);
   const signals = buildSignals(agent, protocolChecks);
   const health = buildHealth(agent, protocolChecks, signals);
+  const workState = getWorkState(agent);
   const roleLabel = inferRole(agent);
   const channelLabel = inferChannel(agent);
   const modelLabel = inferModel(agent);
@@ -259,12 +271,15 @@ export function buildTeamAgentInsight(agent: Agent): TeamAgentInsight {
   const warningCount = signals.filter((signal) => signal.severity === 'warning').length;
   const blockerCount = signals.filter((signal) => signal.severity === 'error').length;
 
-  // 根据 presence 和 state 生成更准确的摘要
-  const presenceStatus = agent.presence === 'offline' ? '离线' 
-    : agent.state === 'running' || agent.state === 'working' ? '工作中'
-    : agent.state === 'idle' ? '空闲'
-    : agent.state === 'online' || agent.state === 'active' ? '在线'
-    : '未知';
+  const presenceStatus = workState === 'working'
+    ? '工作中'
+    : workState === 'blocked'
+      ? '阻塞'
+      : workState === 'idle'
+        ? '空闲'
+        : workState === 'stale'
+          ? '信号过期'
+          : '离线';
 
   return {
     agent,
@@ -278,17 +293,17 @@ export function buildTeamAgentInsight(agent: Agent): TeamAgentInsight {
     activityEvidence: {
       label: 'Last Active',
       value: agent.last_seen_at || '未知',
-      sourceType: 'runtime',
-      sourceRef: 'public.agents.last_seen_at',
+      sourceType: (agent.status_source as EvidenceSourceType | null | undefined) || 'runtime',
+      sourceRef: agent.status_source === 'derived' ? 'aggregated from tasks/task_events' : 'public.agents.last_seen_at',
       freshness: freshnessLevel,
       updatedAt: agent.last_seen_at,
       confidence: agent.last_seen_at ? 0.92 : 0.25,
     },
     statusEvidence: {
       label: 'Status',
-      value: agent.state,
+      value: workState,
       sourceType: (agent.status_source as EvidenceSourceType | null | undefined) || 'runtime',
-      sourceRef: 'public.agents.state',
+      sourceRef: agent.status_source === 'derived' ? 'aggregated from tasks/task_events' : 'public.agents.state',
       freshness: freshnessLevel,
       updatedAt: agent.last_seen_at,
       confidence: agent.last_seen_at ? 0.88 : 0.4,
@@ -315,11 +330,7 @@ export function buildTeamInsights(agents: Agent[]) {
   const insights = agents.map(buildTeamAgentInsight);
   const summary: TeamOverviewSummary = {
     total: insights.length,
-    onlineCount: insights.filter((item) => {
-      const online = isOnline(item.agent.state);
-      const notOffline = item.agent.presence !== 'offline';
-      return online && notOffline;
-    }).length,
+    onlineCount: insights.filter((item) => isOnline(item.agent)).length,
     active24hCount: insights.filter((item) => getFreshnessLevel(item.agent.last_seen_at) !== 'stale' && getFreshnessLevel(item.agent.last_seen_at) !== 'unknown').length,
     healthyCount: insights.filter((item) => item.health.total >= 75 && item.blockerCount === 0).length,
     attentionCount: insights.filter((item) => item.health.total < 75 || item.warningCount > 0 || item.blockerCount > 0).length,

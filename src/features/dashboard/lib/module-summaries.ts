@@ -1,6 +1,6 @@
 import type { Agent, Event, Health, MemoryTopic, Pipeline, Task } from '@/lib/types';
 
-const ACTIVE_AGENT_STATES = new Set(['online', 'active', 'running']);
+const ACTIVE_AGENT_STATES = new Set(['online', 'active', 'running', 'blocked']);
 const IDLE_AGENT_STATES = new Set(['idle']);
 
 function parseDate(value: string | null | undefined) {
